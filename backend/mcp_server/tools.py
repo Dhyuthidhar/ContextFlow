@@ -111,40 +111,34 @@ async def handle_upload_document(arguments: dict[str, Any]) -> dict[str, Any]:
 
 
 async def handle_analyze_project(arguments: dict[str, Any]) -> dict[str, Any]:
+    from learning_engine.engine import run_learning_engine
+
     try:
         project_id = arguments.get("project_id", "").strip()
         if not project_id:
-            return {"success": False, "error": "Argument 'project_id' must be non-empty"}
+            return {"success": False, "error": "project_id is required"}
 
         client = get_client()
-        response = (
+        unanalyzed = (
             client.table("documents")
             .select("id")
             .eq("project_id", project_id)
             .eq("analyzed", False)
             .execute()
         )
-        unanalyzed = response.data
 
-        if not unanalyzed:
+        if not unanalyzed.data:
             return {
                 "success": True,
                 "data": {"message": "No unanalyzed documents found", "count": 0},
             }
 
-        document_ids: list[str] = []
-        for doc in unanalyzed:
+        for doc in unanalyzed.data:
             await create_analysis_job(doc["id"])
-            document_ids.append(doc["id"])
 
-        return {
-            "success": True,
-            "data": {
-                "jobs_created": len(document_ids),
-                "document_ids": document_ids,
-                "message": "Analysis jobs queued. Run the learning engine to process.",
-            },
-        }
+        result = await run_learning_engine(project_id=project_id)
+
+        return {"success": True, "data": result}
     except Exception as exc:
         logger.error("handle_analyze_project error: %s", exc)
         return {"success": False, "error": str(exc)}
