@@ -1,0 +1,13 @@
+[project]
+name = "contextflow-backend"
+version = "0.1.0"
+requires-python = ">=3.11"
+description = "ContextFlow AI context management backend"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.pyright]
+pythonVersion = "3.11"
+strict = true
