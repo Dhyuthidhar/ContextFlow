@@ -44,9 +44,7 @@ export default function ProjectActions({ projectId, documentCount }: Props) {
         setAnalyzeError(json.error ?? 'Analysis failed')
         return
       }
-      const text = json.data?.content?.[0]?.text
-      const parsed = text ? JSON.parse(text) : {}
-      setAnalyzeResult(parsed.data ?? parsed)
+      setAnalyzeResult({ message: json.message })
     } catch (e: unknown) {
       setAnalyzeError(e instanceof Error ? e.message : 'Network error')
     } finally {
@@ -71,9 +69,7 @@ export default function ProjectActions({ projectId, documentCount }: Props) {
         setQueryError(json.error ?? 'Query failed')
         return
       }
-      const text = json.data?.content?.[0]?.text
-      const parsed = text ? JSON.parse(text) : {}
-      setQueryResult(parsed.data ?? parsed)
+      setQueryResult(json.data ?? {})
     } catch (e: unknown) {
       setQueryError(e instanceof Error ? e.message : 'Network error')
     } finally {
@@ -111,8 +107,7 @@ export default function ProjectActions({ projectId, documentCount }: Props) {
         </button>
         {analyzeResult && (
           <div className="mt-3 px-3 py-2 bg-green-50 border border-green-200 rounded-md text-xs text-green-700">
-            ✓ {analyzeResult.principles_created ?? 0} principles created, {analyzeResult.principles_updated ?? 0} updated, {analyzeResult.jobs_processed ?? 0} jobs processed
-            {analyzeResult.message && <span className="block text-green-600 mt-0.5">{analyzeResult.message}</span>}
+            ✓ {analyzeResult.message ?? 'Analysis started in background.'}
           </div>
         )}
         {analyzeError && (

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { spawnSync } from 'child_process'
+import { spawn } from 'child_process'
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,27 +18,23 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    const result = spawnSync(
+    const proc = spawn(
       '/Users/sssd/Documents/ContextFlow/backend/.venv/bin/python3',
       ['-m', 'mcp_server.server'],
       {
-        input: payload,
         cwd: '/Users/sssd/Documents/ContextFlow/backend',
-        timeout: 180000,
-        encoding: 'utf8',
+        detached: true,
+        stdio: ['pipe', 'ignore', 'ignore'],
       }
     )
+    proc.stdin.write(payload)
+    proc.stdin.end()
+    proc.unref()
 
-    if (result.error) throw result.error
-    if (result.stderr) console.error('[analyze] stderr:', result.stderr)
-
-    const lines = result.stdout.split('\n').filter((l: string) => l.startsWith('{'))
-    if (!lines.length) {
-      return NextResponse.json({ error: 'No response from backend' }, { status: 500 })
-    }
-
-    const response = JSON.parse(lines[lines.length - 1])
-    return NextResponse.json({ success: true, data: response.result })
+    return NextResponse.json({
+      success: true,
+      message: 'Analysis started. Refresh in 2-3 minutes to see new principles.',
+    })
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Unknown error'
     return NextResponse.json({ error: msg }, { status: 500 })
