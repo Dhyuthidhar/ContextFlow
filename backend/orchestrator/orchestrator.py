@@ -89,7 +89,7 @@ async def orchestrate_query(
         if category_hint and intent.category == "other":
             intent.category = category_hint
 
-        storage1_task = query_storage1_filtered(intent, min_similarity=0.3, limit=limit)
+        storage1_task = query_storage1_filtered(intent, min_similarity=0.1, limit=limit)
         storage2_task = query_storage2_with_expansions(intent)
         results = await asyncio.gather(storage1_task, storage2_task)
 

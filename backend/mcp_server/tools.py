@@ -57,33 +57,32 @@ async def handle_create_project(arguments: dict[str, Any]) -> dict[str, Any]:
 
 
 async def handle_upload_document(arguments: dict[str, Any]) -> dict[str, Any]:
+    from file_processing.chunker import process_document_file
+
+    required = ["project_id", "filename", "file_type", "doc_category", "content"]
+    missing = [r for r in required if not arguments.get(r)]
+    if missing:
+        return {"success": False, "error": f"Missing required arguments: {', '.join(missing)}"}
+
+    project_id = arguments["project_id"]
+    filename = arguments["filename"]
+    file_type = arguments["file_type"].lstrip(".").lower()
+    doc_category = arguments["doc_category"]
+    content = arguments["content"]
+
+    valid_categories = ["prd", "brd", "architecture", "chat", "other"]
+    if doc_category not in valid_categories:
+        return {"success": False, "error": f"doc_category must be one of: {valid_categories}"}
+
     try:
-        project_id = arguments.get("project_id", "").strip()
-        filename = arguments.get("filename", "").strip()
-        content = arguments.get("content", "")
-        doc_category = arguments.get("doc_category", "other")
-
-        if not project_id:
-            return {"success": False, "error": "Argument 'project_id' must be non-empty"}
-        if not filename:
-            return {"success": False, "error": "Argument 'filename' must be non-empty"}
-        if not content:
-            return {"success": False, "error": "Argument 'content' must be non-empty"}
-        if doc_category not in _VALID_DOC_CATEGORIES:
-            return {"success": False, "error": f"'doc_category' must be one of {sorted(_VALID_DOC_CATEGORIES)}"}
-
-        file_type = arguments.get("file_type") or _infer_file_type(filename)
-        if file_type not in _VALID_FILE_TYPES:
-            file_type = "txt"
+        client = get_client()
 
         storage_path = f"{project_id}/{filename}"
         content_bytes = content.encode("utf-8")
-
-        client = get_client()
         client.storage.from_("documents").upload(
             path=storage_path,
             file=content_bytes,
-            file_options={"content-type": "text/plain"},
+            file_options={"content-type": "text/plain", "upsert": "true"},
         )
 
         doc_data: dict[str, Any] = {
@@ -92,17 +91,30 @@ async def handle_upload_document(arguments: dict[str, Any]) -> dict[str, Any]:
             "file_type": file_type,
             "doc_category": doc_category,
             "storage_path": storage_path,
-            "file_size": len(content_bytes),
             "analyzed": False,
         }
-        document = await create_document(doc_data)
+        doc_response = client.table("documents").insert(doc_data).execute()
+        document_id = doc_response.data[0]["id"]
+
+        processing_result = await process_document_file(
+            document_id=document_id,
+            storage_path=storage_path,
+            filename=filename,
+            file_type=file_type,
+        )
+
+        if processing_result.get("chunk_count", 0) > 0:
+            client.table("documents").update({"analyzed": True}).eq("id", document_id).execute()
 
         return {
             "success": True,
             "data": {
-                "document_id": document["id"],
-                "filename": document["filename"],
-                "storage_path": document["storage_path"],
+                "document_id": document_id,
+                "filename": filename,
+                "storage_path": storage_path,
+                "chunk_count": processing_result.get("chunk_count", 0),
+                "char_count": processing_result.get("char_count", 0),
+                "processing": processing_result,
             },
         }
     except Exception as exc:
