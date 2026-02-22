@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string; numpages: number }>
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,6 +7,9 @@ export async function POST(req: NextRequest) {
     if (!file) return NextResponse.json({ error: 'No file' }, { status: 400 })
 
     const buffer = Buffer.from(await file.arrayBuffer())
+
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const pdfParse = require('pdf-parse/lib/pdf-parse.js')
     const data = await pdfParse(buffer)
 
     return NextResponse.json({
@@ -16,6 +17,7 @@ export async function POST(req: NextRequest) {
       numPages: data.numpages,
     })
   } catch (error) {
+    console.error('PDF parse error:', error)
     return NextResponse.json({ error: 'Failed to parse PDF' }, { status: 500 })
   }
 }
