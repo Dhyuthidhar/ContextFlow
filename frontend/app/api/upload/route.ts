@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { execFile } from 'child_process'
-import { promisify } from 'util'
-import path from 'path'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 
-const execFileAsync = promisify(execFile)
-
-const BACKEND_DIR = path.resolve(process.cwd(), '../backend')
-const PYTHON = path.join(BACKEND_DIR, '.venv', 'bin', 'python3')
+export const maxDuration = 60
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,59 +19,40 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `doc_category must be one of: ${validCategories.join(', ')}` }, { status: 400 })
     }
 
-    const payload = JSON.stringify({
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'tools/call',
-      params: {
-        name: 'contextflow_upload_document',
-        arguments: { project_id, filename, file_type, doc_category, content },
-      },
-    })
+    const storage_path = `${project_id}/${filename}`
+    const contentBytes = Buffer.from(content, 'utf-8')
 
-    const { stdout, stderr } = await execFileAsync(
-      PYTHON,
-      ['-m', 'mcp_server.server'],
-      {
-        cwd: BACKEND_DIR,
-        input: payload,
-        timeout: 30000,
-        maxBuffer: 10 * 1024 * 1024,
-      } as Parameters<typeof execFileAsync>[2] & { input: string }
-    )
+    const { error: storageError } = await supabaseAdmin.storage
+      .from('documents')
+      .upload(storage_path, contentBytes, { contentType: 'text/plain', upsert: true })
 
-    if (stderr) {
-      console.error('[upload] stderr:', stderr)
+    if (storageError) {
+      return NextResponse.json({ error: `Storage upload failed: ${storageError.message}` }, { status: 500 })
     }
 
-    const line = String(stdout).trim().split('\n').find((l: string) => l.startsWith('{'))
-    if (!line) {
-      return NextResponse.json({ error: 'No response from backend' }, { status: 500 })
+    const { data: doc, error: dbError } = await supabaseAdmin
+      .from('documents')
+      .insert({
+        project_id,
+        filename,
+        file_type: file_type.replace(/^\./, '').toLowerCase(),
+        doc_category,
+        storage_path,
+        analyzed: false,
+      })
+      .select()
+      .single()
+
+    if (dbError) {
+      return NextResponse.json({ error: `DB insert failed: ${dbError.message}` }, { status: 500 })
     }
 
-    const rpcResponse = JSON.parse(line)
-    if (rpcResponse.error) {
-      return NextResponse.json({ error: rpcResponse.error.message ?? 'RPC error' }, { status: 500 })
-    }
-
-    const text = rpcResponse.result?.content?.[0]?.text
-    if (!text) {
-      return NextResponse.json({ error: 'Empty result from backend' }, { status: 500 })
-    }
-
-    const result = JSON.parse(text)
-    if (!result.success) {
-      return NextResponse.json({ error: result.error ?? 'Upload failed' }, { status: 500 })
-    }
-
-    const data = result.data ?? {}
     return NextResponse.json({
       success: true,
-      document_id: data.document_id,
-      filename: data.filename,
-      storage_path: data.storage_path,
-      chunk_count: data.chunk_count ?? 0,
-      char_count: data.char_count ?? 0,
+      document_id: doc.id,
+      filename: doc.filename,
+      chunk_count: 0,
+      message: 'File uploaded. Click Analyze to extract principles.',
     })
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Unknown error'
