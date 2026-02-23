@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "contextflow": {
-      "command": "python3",
-      "args": ["/ABSOLUTE/PATH/TO/backend/mcp_server/server.py"],
+      "command": "/Users/sssd/Documents/ContextFlow/backend/.venv/bin/python3",
+      "args": ["/Users/sssd/Documents/ContextFlow/backend/mcp_server/server.py"],
       "env": {
         "SUPABASE_URL": "YOUR_SUPABASE_URL",
         "SUPABASE_SERVICE_KEY": "YOUR_SERVICE_KEY",
