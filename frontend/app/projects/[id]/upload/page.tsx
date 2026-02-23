@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import { supabase } from '@/lib/supabase'
 
 const DOC_CATEGORIES = ['architecture', 'prd', 'brd', 'chat', 'other']
 
@@ -35,7 +36,7 @@ function fileIcon(name: string) {
   return '📝'
 }
 
-type FileStatus = 'waiting' | 'parsing' | 'uploading' | 'done' | 'error'
+type FileStatus = 'waiting' | 'parsing' | 'uploading' | 'done' | 'error' | 'duplicate'
 
 interface FileEntry {
   id: string
@@ -55,23 +56,47 @@ export default function UploadPage() {
   const [globalCategory, setGlobalCategory] = useState('other')
   const [running, setRunning] = useState(false)
   const [allDone, setAllDone] = useState(false)
+  const [existingFilenames, setExistingFilenames] = useState<Set<string>>(new Set())
   const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    supabase
+      .from('documents')
+      .select('filename')
+      .eq('project_id', id)
+      .then(({ data }) => {
+        if (data) {
+          setExistingFilenames(new Set(data.map((d) => d.filename.toLowerCase())))
+        }
+      })
+  }, [id])
 
   function addFiles(files: FileList | File[]) {
     const arr = Array.from(files)
     const valid: FileEntry[] = []
-    for (const f of arr) {
-      const ext = f.name.split('.').pop()?.toLowerCase() ?? ''
-      if (!['pdf', 'md', 'txt'].includes(ext)) continue
-      if (f.size > 10 * 1024 * 1024) continue
-      valid.push({
-        id: `${f.name}-${f.size}-${Date.now()}-${Math.random()}`,
-        file: f,
-        category: detectCategory(f.name),
-        status: 'waiting',
-      })
-    }
-    setEntries((prev) => [...prev, ...valid])
+    const seenInBatch = new Set<string>()
+
+    setEntries((prev) => {
+      const existingNames = new Set(prev.map((e) => e.file.name.toLowerCase()))
+
+      for (const f of arr) {
+        const ext = f.name.split('.').pop()?.toLowerCase() ?? ''
+        if (!['pdf', 'md', 'txt'].includes(ext)) continue
+        if (f.size > 10 * 1024 * 1024) continue
+        const nameLower = f.name.toLowerCase()
+        // deduplicate within current selection and existing list entries
+        if (seenInBatch.has(nameLower) || existingNames.has(nameLower)) continue
+        seenInBatch.add(nameLower)
+        const isDuplicate = existingFilenames.has(nameLower)
+        valid.push({
+          id: `${f.name}-${f.size}-${Date.now()}-${Math.random()}`,
+          file: f,
+          category: detectCategory(f.name),
+          status: isDuplicate ? 'duplicate' : 'waiting',
+        })
+      }
+      return [...prev, ...valid]
+    })
     setAllDone(false)
   }
 
@@ -157,6 +182,7 @@ export default function UploadPage() {
     uploading: '🔄',
     done: '✅',
     error: '❌',
+    duplicate: '⚠️',
   }
 
   const statusLabel: Record<FileStatus, string> = {
@@ -165,11 +191,15 @@ export default function UploadPage() {
     uploading: 'Uploading & indexing…',
     done: 'Done',
     error: 'Failed',
+    duplicate: 'Already uploaded — skipping',
   }
 
   const doneCount = entries.filter((e) => e.status === 'done').length
   const failedCount = entries.filter((e) => e.status === 'error').length
-  const canUpload = entries.some((e) => e.status === 'waiting' || e.status === 'error') && !running
+  const duplicateCount = entries.filter((e) => e.status === 'duplicate').length
+  const uploadableCount = entries.filter((e) => e.status === 'waiting' || e.status === 'error').length
+  const canUpload = uploadableCount > 0 && !running
+  const allDuplicates = entries.length > 0 && uploadableCount === 0 && !running && !allDone
 
   return (
     <div className="p-8 max-w-2xl">
@@ -235,7 +265,14 @@ export default function UploadPage() {
               {entries.length} file{entries.length !== 1 ? 's' : ''} selected
             </p>
             {entries.map((entry) => (
-              <div key={entry.id} className="flex items-center gap-3 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-md">
+              <div
+                key={entry.id}
+                className={`flex items-center gap-3 px-3 py-2.5 border rounded-md ${
+                  entry.status === 'duplicate'
+                    ? 'bg-amber-50 border-amber-200'
+                    : 'bg-gray-50 border-gray-200'
+                }`}
+              >
                 <span className="text-lg shrink-0">{statusIcon[entry.status]}</span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -246,6 +283,7 @@ export default function UploadPage() {
                     <span className={`text-xs ${
                       entry.status === 'done' ? 'text-green-600' :
                       entry.status === 'error' ? 'text-red-500' :
+                      entry.status === 'duplicate' ? 'text-amber-600' :
                       entry.status === 'waiting' ? 'text-gray-400' : 'text-blue-600'
                     }`}>
                       {entry.status === 'done' && entry.chunkCount !== undefined
@@ -263,16 +301,18 @@ export default function UploadPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <select
-                    value={entry.category}
-                    onChange={(e) => updateEntry(entry.id, { category: e.target.value })}
-                    disabled={running || entry.status === 'done'}
-                    className="text-xs border border-gray-200 rounded px-1.5 py-1 bg-white outline-none focus:border-[#2563eb] disabled:opacity-50"
-                  >
-                    {DOC_CATEGORIES.map((c) => (
-                      <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
-                    ))}
-                  </select>
+                  {entry.status !== 'duplicate' && (
+                    <select
+                      value={entry.category}
+                      onChange={(e) => updateEntry(entry.id, { category: e.target.value })}
+                      disabled={running || entry.status === 'done'}
+                      className="text-xs border border-gray-200 rounded px-1.5 py-1 bg-white outline-none focus:border-[#2563eb] disabled:opacity-50"
+                    >
+                      {DOC_CATEGORIES.map((c) => (
+                        <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+                      ))}
+                    </select>
+                  )}
                   {!running && entry.status !== 'uploading' && entry.status !== 'parsing' && (
                     <button
                       onClick={() => removeEntry(entry.id)}
@@ -288,6 +328,13 @@ export default function UploadPage() {
           </div>
         )}
 
+        {/* All duplicates warning */}
+        {allDuplicates && (
+          <div className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-700">
+            All selected files already exist in this project.
+          </div>
+        )}
+
         {/* Summary after all done */}
         {allDone && entries.length > 0 && (
           <div className={`px-3 py-2 rounded-md text-xs border ${
@@ -295,9 +342,13 @@ export default function UploadPage() {
               ? 'bg-green-50 border-green-200 text-green-700'
               : 'bg-yellow-50 border-yellow-200 text-yellow-700'
           }`}>
-            {failedCount === 0
-              ? `✓ ${doneCount}/${entries.length} files uploaded successfully`
-              : `${doneCount}/${entries.length} uploaded — ${failedCount} failed`}
+            {(() => {
+              const parts: string[] = []
+              if (doneCount > 0) parts.push(`${doneCount} uploaded successfully`)
+              if (failedCount > 0) parts.push(`${failedCount} failed`)
+              if (duplicateCount > 0) parts.push(`${duplicateCount} skipped (already exists)`)
+              return `✓ ${parts.join(' • ')}`
+            })()}
           </div>
         )}
 
@@ -312,7 +363,7 @@ export default function UploadPage() {
               ? 'Uploading…'
               : entries.length === 0
               ? 'Select files to upload'
-              : `Upload ${entries.filter((e) => e.status === 'waiting' || e.status === 'error').length} file${entries.filter((e) => e.status === 'waiting' || e.status === 'error').length !== 1 ? 's' : ''}`}
+              : `Upload ${uploadableCount} file${uploadableCount !== 1 ? 's' : ''}`}
           </button>
           {allDone && doneCount > 0 && (
             <Link
