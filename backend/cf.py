@@ -42,17 +42,46 @@ def _bold(text: str) -> str:
 
 
 # ── Project lookup ────────────────────────────────────────────────────────────
-def _load_projects() -> dict[str, str]:
+def _load_projects_json() -> dict[str, str]:
     if not os.path.exists(_PROJECTS_FILE):
         return {}
     with open(_PROJECTS_FILE) as f:
         return json.load(f)
 
 
-def _resolve_project(name: str) -> str | None:
-    projects = _load_projects()
+def _supabase_search(name: str) -> list[dict]:
+    from utils.supabase_client import get_client
+    client = get_client()
+    response = client.table("projects").select("id, name, description, project_type").execute()
+    needle = name.lower().strip()
+    return [p for p in (response.data or []) if needle in p.get("name", "").lower()]
+
+
+def _supabase_list_all() -> list[dict]:
+    from utils.supabase_client import get_client
+    client = get_client()
+    response = client.table("projects").select("id, name, description, project_type, status").order("name").execute()
+    return response.data or []
+
+
+def _resolve_project(name: str) -> tuple[str | None, str | None]:
+    """Returns (project_id, display_name) or (None, None)."""
     key = name.lower().strip()
-    return projects.get(key)
+
+    overrides = _load_projects_json()
+    if key in overrides:
+        return overrides[key], name
+
+    matches = _supabase_search(name)
+    if len(matches) == 1:
+        return matches[0]["id"], matches[0]["name"]
+    if len(matches) > 1:
+        print(_c(Fore.YELLOW, f"\n⚠ Multiple projects match '{name}':"))
+        for m in matches:
+            print(f"  {_c(Fore.YELLOW, m['name'].ljust(30))}  {_c(Fore.CYAN, m['id'])}")
+        print(f"\n  Use a more specific name or pass {_c(Fore.CYAN, '--project-id <uuid>')} directly.\n")
+        sys.exit(1)
+    return None, None
 
 
 # ── Formatting ────────────────────────────────────────────────────────────────
@@ -137,17 +166,32 @@ def _print_results(query: str, project_name: str | None, data: dict) -> None:
     print()
 
 
-def _print_projects(projects: dict[str, str]) -> None:
+def _print_projects() -> None:
     print()
     print(_divider())
     print(_bold("ContextFlow  |  Available Projects"))
     print(_divider())
+    try:
+        projects = _supabase_list_all()
+    except Exception as exc:
+        print(_c(Fore.RED, f"  ✗ Could not fetch projects: {exc}"))
+        print(_divider())
+        print()
+        return
     if not projects:
-        print(f"  {_c(Fore.YELLOW, 'No projects configured.')}")
-        print(f"  Add entries to {_PROJECTS_FILE}")
+        print(f"  {_c(Fore.YELLOW, 'No projects found.')}")
     else:
-        for name, uuid in projects.items():
-            print(f"  {_c(Fore.YELLOW, name.ljust(20))}  {_c(Fore.CYAN, uuid)}")
+        for p in projects:
+            name = p.get("name", "(unnamed)")
+            uuid = p.get("id", "")
+            ptype = p.get("project_type") or ""
+            desc = (p.get("description") or "")[:50]
+            line = f"  {_c(Fore.YELLOW, name.ljust(24))}  {_c(Fore.CYAN, uuid)}"
+            if ptype:
+                line += f"  {_c(Fore.WHITE, f'[{ptype}]')}"
+            print(line)
+            if desc:
+                print(f"  {' ' * 24}  {_c(Fore.WHITE, desc)}")
     print(_divider())
     print()
 
@@ -190,7 +234,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.list_projects:
-        _print_projects(_load_projects())
+        _print_projects()
         return
 
     if not args.query:
@@ -201,11 +245,9 @@ def main() -> None:
     project_name: str | None = None
 
     if args.project and not project_id:
-        project_id = _resolve_project(args.project)
-        if project_id:
-            project_name = args.project
-        else:
-            print(_c(Fore.RED, f"\n✗ Project '{args.project}' not found in projects.json"))
+        project_id, project_name = _resolve_project(args.project)
+        if not project_id:
+            print(_c(Fore.RED, f"\n✗ No project matching '{args.project}' found."))
             print(f"  Run {_c(Fore.CYAN, 'cf --list-projects')} to see available projects.\n")
             sys.exit(1)
 
