@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import ProjectActions from './ProjectActions'
+import ProjectHeader from './ProjectHeader'
 
 const CATEGORY_COLORS: Record<string, string> = {
   architecture: 'bg-blue-100 text-blue-700',
@@ -53,26 +54,7 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
   return (
     <div className="p-8">
       {/* Header */}
-      <div className="flex items-start gap-3 mb-2">
-        <Link href="/projects" className="mt-1.5 text-gray-400 hover:text-gray-600 transition-colors shrink-0">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19 12H5M12 5l-7 7 7 7" />
-          </svg>
-        </Link>
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-[#0f0f0f] font-mono">{project.name}</h1>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">{project.project_type}</span>
-            {project.status === 'active' && (
-              <span className="flex items-center gap-1 text-xs text-green-600">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />active
-              </span>
-            )}
-          </div>
-          {project.description && <p className="text-gray-500 text-sm mt-1">{project.description}</p>}
-          {project.tech_stack && <p className="text-gray-400 text-xs mt-0.5">Stack: {project.tech_stack}</p>}
-        </div>
-      </div>
+      <ProjectHeader project={project} />
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mt-6 mb-8">
