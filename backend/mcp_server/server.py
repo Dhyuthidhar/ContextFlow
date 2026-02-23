@@ -13,14 +13,9 @@ import logging
 from typing import Any, Optional
 
 from utils.config import LOG_LEVEL
-from mcp_server.tools import (
-    handle_query,
-    handle_create_project,
-    handle_upload_document,
-    handle_analyze_project,
-    handle_list_projects,
-    handle_get_principles,
-)
+
+_tools_loaded = False
+_HANDLERS: dict[str, Any] = {}
 
 # Logging — stderr only
 _handler = logging.StreamHandler(sys.stderr)
@@ -30,10 +25,33 @@ logger.addHandler(_handler)
 logger.setLevel(getattr(logging, LOG_LEVEL.upper(), logging.INFO))
 logger.propagate = False
 
-# Tool registry
+def _ensure_tools_loaded() -> None:
+    global _tools_loaded, _HANDLERS
+    if _tools_loaded:
+        return
+    from mcp_server.tools import (
+        handle_query,
+        handle_create_project,
+        handle_upload_document,
+        handle_analyze_project,
+        handle_list_projects,
+        handle_get_principles,
+    )
+    _HANDLERS = {
+        "contextflow_query": handle_query,
+        "contextflow_create_project": handle_create_project,
+        "contextflow_upload_document": handle_upload_document,
+        "contextflow_analyze_project": handle_analyze_project,
+        "contextflow_list_projects": handle_list_projects,
+        "contextflow_get_principles": handle_get_principles,
+    }
+    _tools_loaded = True
+
+
+# Tool registry — schemas only, no handler imports at module level
 TOOLS: dict[str, dict[str, Any]] = {
     "contextflow_query": {
-        "handler": handle_query,
+        "handler": None,
         "schema": {
             "name": "contextflow_query",
             "description": "Query ContextFlow for engineering context, patterns and principles relevant to your current task",
@@ -62,7 +80,7 @@ TOOLS: dict[str, dict[str, Any]] = {
         },
     },
     "contextflow_create_project": {
-        "handler": handle_create_project,
+        "handler": None,
         "schema": {
             "name": "contextflow_create_project",
             "description": "Create a new project in ContextFlow",
@@ -92,7 +110,7 @@ TOOLS: dict[str, dict[str, Any]] = {
         },
     },
     "contextflow_upload_document": {
-        "handler": handle_upload_document,
+        "handler": None,
         "schema": {
             "name": "contextflow_upload_document",
             "description": "Upload a document to a project for analysis",
@@ -127,7 +145,7 @@ TOOLS: dict[str, dict[str, Any]] = {
         },
     },
     "contextflow_analyze_project": {
-        "handler": handle_analyze_project,
+        "handler": None,
         "schema": {
             "name": "contextflow_analyze_project",
             "description": "Trigger the learning engine to analyze all unprocessed documents in a project",
@@ -144,7 +162,7 @@ TOOLS: dict[str, dict[str, Any]] = {
         },
     },
     "contextflow_list_projects": {
-        "handler": handle_list_projects,
+        "handler": None,
         "schema": {
             "name": "contextflow_list_projects",
             "description": "List all projects in ContextFlow",
@@ -156,7 +174,7 @@ TOOLS: dict[str, dict[str, Any]] = {
         },
     },
     "contextflow_get_principles": {
-        "handler": handle_get_principles,
+        "handler": None,
         "schema": {
             "name": "contextflow_get_principles",
             "description": "Get engineering principles from Storage 2, optionally filtered by category",
@@ -196,8 +214,11 @@ async def dispatch(tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     if missing:
         return {"error": f"Missing required arguments: {', '.join(missing)}", "success": False}
 
+    _ensure_tools_loaded()
+    handler = _HANDLERS[tool_name]
+
     try:
-        result = await entry["handler"](arguments)
+        result = await handler(arguments)
         return result
     except Exception as exc:
         logger.error("Tool %s raised exception: %s", tool_name, exc)
