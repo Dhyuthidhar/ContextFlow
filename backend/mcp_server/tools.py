@@ -57,7 +57,6 @@ async def handle_create_project(arguments: dict[str, Any]) -> dict[str, Any]:
 
 
 async def handle_upload_document(arguments: dict[str, Any]) -> dict[str, Any]:
-    from file_processing.chunker import process_document_file
 
     required = ["project_id", "filename", "file_type", "doc_category", "content"]
     missing = [r for r in required if not arguments.get(r)]
@@ -96,14 +95,13 @@ async def handle_upload_document(arguments: dict[str, Any]) -> dict[str, Any]:
         doc_response = client.table("documents").insert(doc_data).execute()
         document_id = doc_response.data[0]["id"]
 
-        processing_result = await process_document_file(
-            document_id=document_id,
-            storage_path=storage_path,
-            filename=filename,
-            file_type=file_type,
-        )
+        from file_processing.extractor import clean_extracted_text
+        from file_processing.chunker import process_and_store_chunks
 
-        if processing_result.get("chunk_count", 0) > 0:
+        cleaned = clean_extracted_text(content)
+        chunk_count = await process_and_store_chunks(document_id, cleaned)
+
+        if chunk_count > 0:
             client.table("documents").update({"analyzed": True}).eq("id", document_id).execute()
 
         return {
@@ -112,9 +110,8 @@ async def handle_upload_document(arguments: dict[str, Any]) -> dict[str, Any]:
                 "document_id": document_id,
                 "filename": filename,
                 "storage_path": storage_path,
-                "chunk_count": processing_result.get("chunk_count", 0),
-                "char_count": processing_result.get("char_count", 0),
-                "processing": processing_result,
+                "chunk_count": chunk_count,
+                "char_count": len(cleaned),
             },
         }
     except Exception as exc:
