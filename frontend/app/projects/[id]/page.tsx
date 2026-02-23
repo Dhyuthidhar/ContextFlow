@@ -34,16 +34,21 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
   const [projectRes, docsRes, principlesRes] = await Promise.all([
     supabaseAdmin.from('projects').select('*').eq('id', id).single(),
     supabaseAdmin.from('documents').select('id, filename, doc_category, file_type, analyzed, upload_date').eq('project_id', id).order('upload_date', { ascending: false }),
-    supabaseAdmin.from('principles').select('id', { count: 'exact' }).eq('source', 'user_derived'),
+    supabaseAdmin.from('principles').select('id', { count: 'exact', head: true }).contains('source_projects', [id]),
   ])
 
   const project = projectRes.data
   if (!project) notFound()
 
   const documents = docsRes.data ?? []
+  const docIds = documents.map((d) => d.id)
+
+  const chunksRes = docIds.length > 0
+    ? await supabaseAdmin.from('document_chunks').select('id', { count: 'exact', head: true }).in('document_id', docIds)
+    : { count: 0 }
+
   const principlesCount = principlesRes.count ?? 0
-  const analyzedCount = documents.filter((d) => d.analyzed).length
-  const chunksIndexed = analyzedCount > 0 ? `~${analyzedCount * 5}` : '0'
+  const chunksIndexed = chunksRes.count ?? 0
 
   return (
     <div className="p-8">

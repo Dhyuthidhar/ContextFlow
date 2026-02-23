@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase-admin'
+import { spawnSync } from 'child_process'
 
 export const maxDuration = 60
+
+const PYTHON = '/Users/sssd/Documents/ContextFlow/backend/.venv/bin/python3'
+const BACKEND_DIR = '/Users/sssd/Documents/ContextFlow/backend'
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,45 +17,61 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Missing fields: ${missing.join(', ')}` }, { status: 400 })
     }
 
-    const validCategories = ['architecture', 'prd', 'brd', 'chat', 'other']
-    if (!validCategories.includes(doc_category)) {
-      return NextResponse.json({ error: `doc_category must be one of: ${validCategories.join(', ')}` }, { status: 400 })
+    const payload = JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/call',
+      params: {
+        name: 'contextflow_upload_document',
+        arguments: { project_id, filename, file_type, doc_category, content },
+      },
+    })
+
+    const result = spawnSync(PYTHON, ['-m', 'mcp_server.server'], {
+      input: payload,
+      cwd: BACKEND_DIR,
+      encoding: 'utf8',
+      timeout: 55000,
+    })
+
+    if (result.error) {
+      return NextResponse.json({ error: `Process error: ${result.error.message}` }, { status: 500 })
     }
 
-    const storage_path = `${project_id}/${filename}`
-    const contentBytes = Buffer.from(content, 'utf-8')
-
-    const { error: storageError } = await supabaseAdmin.storage
-      .from('documents')
-      .upload(storage_path, contentBytes, { contentType: 'text/plain', upsert: true })
-
-    if (storageError) {
-      return NextResponse.json({ error: `Storage upload failed: ${storageError.message}` }, { status: 500 })
+    if (result.status !== 0) {
+      console.error('[upload] stderr:', result.stderr)
+      return NextResponse.json({ error: `Backend error: ${result.stderr?.slice(0, 300)}` }, { status: 500 })
     }
 
-    const { data: doc, error: dbError } = await supabaseAdmin
-      .from('documents')
-      .insert({
-        project_id,
-        filename,
-        file_type: file_type.replace(/^\./, '').toLowerCase(),
-        doc_category,
-        storage_path,
-        analyzed: false,
-      })
-      .select()
-      .single()
+    let parsed: any
+    try {
+      parsed = JSON.parse(result.stdout.trim())
+    } catch {
+      return NextResponse.json({ error: 'Invalid response from backend' }, { status: 500 })
+    }
 
-    if (dbError) {
-      return NextResponse.json({ error: `DB insert failed: ${dbError.message}` }, { status: 500 })
+    const text = parsed?.result?.content?.[0]?.text
+    if (!text) {
+      return NextResponse.json({ error: 'Empty response from backend' }, { status: 500 })
+    }
+
+    let data: any
+    try {
+      data = JSON.parse(text)
+    } catch {
+      return NextResponse.json({ error: 'Could not parse backend result' }, { status: 500 })
+    }
+
+    if (!data.success) {
+      return NextResponse.json({ error: data.error ?? 'Upload failed' }, { status: 500 })
     }
 
     return NextResponse.json({
       success: true,
-      document_id: doc.id,
-      filename: doc.filename,
-      chunk_count: 0,
-      message: 'File uploaded. Click Analyze to extract principles.',
+      document_id: data.data?.document_id,
+      filename,
+      chunk_count: data.data?.chunk_count ?? 0,
+      message: `Uploaded and indexed ${data.data?.chunk_count ?? 0} chunks.`,
     })
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Unknown error'
