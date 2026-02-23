@@ -74,9 +74,11 @@ async def handle_upload_document(arguments: dict[str, Any]) -> dict[str, Any]:
         return {"success": False, "error": f"doc_category must be one of: {valid_categories}"}
 
     try:
+        import re
         client = get_client()
 
-        storage_path = f"{project_id}/{filename}"
+        safe_filename = re.sub(r'[^a-zA-Z0-9._-]', '_', filename)
+        storage_path = f"{project_id}/{safe_filename}"
         content_bytes = content.encode("utf-8")
         client.storage.from_("documents").upload(
             path=storage_path,
