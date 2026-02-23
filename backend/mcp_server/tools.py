@@ -144,10 +144,15 @@ async def handle_analyze_project(arguments: dict[str, Any]) -> dict[str, Any]:
                 "data": {"message": "No unanalyzed documents found", "count": 0},
             }
 
-        for doc in unanalyzed.data:
+        batch_size = int(arguments.get("batch_size", 3))
+        batch = unanalyzed.data[:batch_size]
+        remaining = max(0, len(unanalyzed.data) - batch_size)
+
+        for doc in batch:
             await create_analysis_job(doc["id"])
 
         result = await run_learning_engine(project_id=project_id)
+        result["remaining"] = remaining
 
         return {"success": True, "data": result}
     except Exception as exc:

@@ -13,13 +13,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'project_id is required' }, { status: 400 })
     }
 
+    const batchSize = typeof body.batch_size === 'number' ? body.batch_size : 3
+
     const payload = JSON.stringify({
       jsonrpc: '2.0',
       id: 1,
       method: 'tools/call',
       params: {
         name: 'contextflow_analyze_project',
-        arguments: { project_id: body.project_id },
+        arguments: { project_id: body.project_id, batch_size: batchSize },
       },
     })
 

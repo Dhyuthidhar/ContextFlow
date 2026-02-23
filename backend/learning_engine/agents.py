@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import sys
 import os
@@ -159,14 +160,17 @@ async def run_agents_for_document(
 
     logger.info("Running agents %s for %s (type=%s)", agent_names, filename, doc_type)
 
-    for agent_name in agent_names:
-        if agent_name in _AGENT_MAP:
-            try:
-                items = await _AGENT_MAP[agent_name](prepared_content)
-                results[agent_name] = items
-                logger.info("Agent %s: extracted %d items", agent_name, len(items))
-            except Exception as exc:
-                logger.error("Agent %s failed: %s", agent_name, exc)
-                results[agent_name] = []
+    valid_agents = [(name, _AGENT_MAP[name]) for name in agent_names if name in _AGENT_MAP]
 
+    async def run_agent(name: str, fn) -> tuple[str, list[dict]]:
+        try:
+            items = await fn(prepared_content)
+            logger.info("Agent %s: extracted %d items", name, len(items))
+            return name, items
+        except Exception as exc:
+            logger.error("Agent %s failed: %s", name, exc)
+            return name, []
+
+    pairs = await asyncio.gather(*[run_agent(n, f) for n, f in valid_agents])
+    results = dict(pairs)
     return results
