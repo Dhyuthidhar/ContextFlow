@@ -1,12 +1,14 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 
-interface AnalyzeResult {
-  principles_created?: number
-  principles_updated?: number
-  jobs_processed?: number
-  message?: string
+interface AnalyzeProgress {
+  docsProcessed: number
+  principlesCreated: number
+  principlesUpdated: number
+  remaining: number
+  batch: number
 }
 
 interface QueryResult {
@@ -19,10 +21,14 @@ interface Props {
   documentCount: number
 }
 
+const BATCH_SIZE = 3
+
 export default function ProjectActions({ projectId, documentCount }: Props) {
+  const router = useRouter()
   const [analyzing, setAnalyzing] = useState(false)
-  const [analyzeResult, setAnalyzeResult] = useState<AnalyzeResult | null>(null)
+  const [progress, setProgress] = useState<AnalyzeProgress | null>(null)
   const [analyzeError, setAnalyzeError] = useState<string | null>(null)
+  const [analyzeDone, setAnalyzeDone] = useState(false)
 
   const [query, setQuery] = useState('')
   const [querying, setQuerying] = useState(false)
@@ -31,20 +37,52 @@ export default function ProjectActions({ projectId, documentCount }: Props) {
 
   async function handleAnalyze() {
     setAnalyzing(true)
-    setAnalyzeResult(null)
+    setAnalyzeDone(false)
     setAnalyzeError(null)
+    setProgress({ docsProcessed: 0, principlesCreated: 0, principlesUpdated: 0, remaining: 0, batch: 0 })
+
+    let totalCreated = 0
+    let totalUpdated = 0
+    let totalProcessed = 0
+    let batch = 0
+
     try {
-      const res = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project_id: projectId }),
-      })
-      const json = await res.json()
-      if (!res.ok || json.error) {
-        setAnalyzeError(json.error ?? 'Analysis failed')
-        return
+      while (true) {
+        batch += 1
+        const res = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ project_id: projectId, batch_size: BATCH_SIZE }),
+        })
+        const json = await res.json()
+
+        if (!res.ok || json.error) {
+          setAnalyzeError(json.error ?? 'Analysis failed')
+          return
+        }
+
+        const data = json.data ?? {}
+        const message: string = data.message ?? ''
+
+        if (message.includes('No unanalyzed') || (data.processed === 0 && (data.remaining ?? 0) === 0)) {
+          setAnalyzeDone(true)
+          setProgress((p) => ({ ...(p!), remaining: 0, batch }))
+          break
+        }
+
+        totalCreated += data.total_created ?? 0
+        totalUpdated += data.total_updated ?? 0
+        totalProcessed += data.processed ?? 0
+        const remaining = data.remaining ?? 0
+
+        setProgress({ docsProcessed: totalProcessed, principlesCreated: totalCreated, principlesUpdated: totalUpdated, remaining, batch })
+
+        if (remaining === 0) {
+          setAnalyzeDone(true)
+          break
+        }
       }
-      setAnalyzeResult({ message: json.message })
+      router.refresh()
     } catch (e: unknown) {
       setAnalyzeError(e instanceof Error ? e.message : 'Network error')
     } finally {
@@ -94,7 +132,9 @@ export default function ProjectActions({ projectId, documentCount }: Props) {
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
               </svg>
-              Analyzing… (this may take a while)
+              {progress && progress.docsProcessed > 0
+                ? `Batch ${progress.batch} — ${progress.docsProcessed} docs, ${progress.principlesCreated} principles…`
+                : 'Analyzing… (this may take a while)'}
             </>
           ) : (
             <>
@@ -105,11 +145,26 @@ export default function ProjectActions({ projectId, documentCount }: Props) {
             </>
           )}
         </button>
-        {analyzeResult && (
-          <div className="mt-3 px-3 py-2 bg-green-50 border border-green-200 rounded-md text-xs text-green-700">
-            ✓ {analyzeResult.message ?? 'Analysis started in background.'}
+
+        {analyzing && progress && progress.docsProcessed > 0 && (
+          <div className="mt-3 px-3 py-2 bg-blue-50 border border-blue-100 rounded-md text-xs text-blue-700 space-y-0.5">
+            <p className="font-medium">Running batch {progress.batch}…</p>
+            <p>{progress.docsProcessed} docs processed · {progress.principlesCreated} created · {progress.principlesUpdated} updated</p>
+            {progress.remaining > 0 && <p className="text-blue-500">{progress.remaining} docs remaining</p>}
           </div>
         )}
+
+        {analyzeDone && !analyzing && progress && (
+          <div className="mt-3 px-3 py-2 bg-green-50 border border-green-200 rounded-md text-xs text-green-700 space-y-0.5">
+            <p className="font-medium">✓ Analysis complete</p>
+            {progress.principlesCreated > 0 || progress.principlesUpdated > 0 ? (
+              <p>{progress.principlesCreated} principles created · {progress.principlesUpdated} updated — refresh to see updated count</p>
+            ) : (
+              <p>All documents already up to date</p>
+            )}
+          </div>
+        )}
+
         {analyzeError && (
           <div className="mt-3 px-3 py-2 bg-red-50 border border-red-200 rounded-md text-xs text-red-600">{analyzeError}</div>
         )}
