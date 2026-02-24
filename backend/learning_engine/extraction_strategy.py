@@ -71,7 +71,7 @@ async def extract_with_3x3(
     system_prompt: str,
     user_prompt_template: str,
     models: Optional[list[str]] = None,
-    runs_per_model: int = 3,
+    runs_per_model: int = 1,
 ) -> list[dict]:
     try:
         if models is None:

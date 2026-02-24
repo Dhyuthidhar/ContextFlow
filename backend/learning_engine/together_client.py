@@ -21,8 +21,7 @@ together_client = AsyncOpenAI(
 
 MODEL_DEEPSEEK = "deepseek-ai/DeepSeek-V3"
 MODEL_LLAMA = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
-MODEL_QWEN = "Qwen/Qwen2.5-72B-Instruct-Turbo-Free"
-ALL_MODELS = [MODEL_DEEPSEEK, MODEL_LLAMA, MODEL_QWEN]
+ALL_MODELS = [MODEL_LLAMA]
 
 
 async def call_model(
