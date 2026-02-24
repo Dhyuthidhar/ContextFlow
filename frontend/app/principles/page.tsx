@@ -69,15 +69,25 @@ export default function PrinciplesPage() {
   const [search, setSearch] = useState('')
 
   useEffect(() => {
-    async function fetch() {
-      const { data } = await supabase
-        .from('principles')
-        .select('id, content, type, category, source, confidence_score, times_applied, when_to_use, when_not_to_use, created_at')
-        .order('confidence_score', { ascending: false })
-      setPrinciples(data ?? [])
+    async function load() {
+      const PAGE = 1000
+      let all: Principle[] = []
+      let from = 0
+      while (true) {
+        const { data } = await supabase
+          .from('principles')
+          .select('id, content, type, category, source, confidence_score, times_applied, when_to_use, when_not_to_use, created_at')
+          .order('confidence_score', { ascending: false })
+          .range(from, from + PAGE - 1)
+        if (!data || data.length === 0) break
+        all = all.concat(data)
+        if (data.length < PAGE) break
+        from += PAGE
+      }
+      setPrinciples(all)
       setLoading(false)
     }
-    fetch()
+    load()
   }, [])
 
   const filtered = useMemo(() => {
@@ -94,11 +104,12 @@ export default function PrinciplesPage() {
   const stats = useMemo(() => {
     if (!principles.length) return null
     const userDerived = principles.filter((p) => p.source === 'user_derived').length
+    const generic = principles.filter((p) => p.source === 'generic').length
     const avgConf = principles.reduce((s, p) => s + p.confidence_score, 0) / principles.length
     const catCounts: Record<string, number> = {}
     for (const p of principles) catCounts[p.category] = (catCounts[p.category] ?? 0) + 1
     const topCat = Object.entries(catCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '—'
-    return { total: principles.length, userDerived, avgConf, topCat }
+    return { total: principles.length, userDerived, generic, avgConf, topCat }
   }, [principles])
 
   return (
@@ -115,12 +126,13 @@ export default function PrinciplesPage() {
 
       {/* Stats bar */}
       {stats && (
-        <div className="grid grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-5 gap-3 mb-6">
           {[
-            { label: 'Total',          value: stats.total },
+            { label: 'Total',           value: stats.total },
             { label: 'Your Principles', value: stats.userDerived },
-            { label: 'Avg Confidence', value: stats.avgConf.toFixed(2) },
-            { label: 'Top Category',   value: stats.topCat },
+            { label: 'Generic',         value: stats.generic },
+            { label: 'Avg Confidence',  value: stats.avgConf.toFixed(2) },
+            { label: 'Top Category',    value: stats.topCat },
           ].map((s) => (
             <div key={s.label} className="bg-white rounded-lg border border-gray-200 px-4 py-3">
               <p className="text-lg font-bold text-[#0f0f0f]">{s.value}</p>
