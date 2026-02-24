@@ -103,9 +103,6 @@ async def handle_upload_document(arguments: dict[str, Any]) -> dict[str, Any]:
         cleaned = clean_extracted_text(content)
         chunk_count = await process_and_store_chunks(document_id, cleaned)
 
-        if chunk_count > 0:
-            client.table("documents").update({"analyzed": True}).eq("id", document_id).execute()
-
         return {
             "success": True,
             "data": {
