@@ -1,5 +1,10 @@
 from __future__ import annotations
+
+import asyncio
+from datetime import datetime, timezone
+from functools import partial
 from typing import Optional
+
 from supabase import create_client, Client
 from utils.config import SUPABASE_URL, SUPABASE_SERVICE_KEY
 
@@ -13,44 +18,49 @@ def get_client() -> Client:
     return _client
 
 
+async def _run(fn, *args, **kwargs):
+    """Run a synchronous Supabase call in a thread pool so it doesn't block the event loop."""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, partial(fn, *args, **kwargs))
+
+
 async def get_projects(user_id: str) -> list[dict]:
     client = get_client()
-    response = client.table("projects").select("*").eq("user_id", user_id).execute()
+    response = await _run(client.table("projects").select("*").eq("user_id", user_id).execute)
     return response.data
 
 
 async def get_project_by_id(project_id: str) -> Optional[dict]:
     client = get_client()
-    response = client.table("projects").select("*").eq("id", project_id).execute()
+    response = await _run(client.table("projects").select("*").eq("id", project_id).execute)
     return response.data[0] if response.data else None
 
 
 async def create_project(user_id: str, data: dict) -> dict:
     client = get_client()
     payload = {**data, "user_id": user_id}
-    response = client.table("projects").insert(payload).execute()
+    response = await _run(client.table("projects").insert(payload).execute)
     return response.data[0]
 
 
 async def get_documents(project_id: str) -> list[dict]:
     client = get_client()
-    response = client.table("documents").select("*").eq("project_id", project_id).execute()
+    response = await _run(client.table("documents").select("*").eq("project_id", project_id).execute)
     return response.data
 
 
 async def create_document(data: dict) -> dict:
     client = get_client()
-    response = client.table("documents").insert(data).execute()
+    response = await _run(client.table("documents").insert(data).execute)
     return response.data[0]
 
 
 async def update_document_analyzed(doc_id: str, analyzed: bool) -> None:
     client = get_client()
-    from datetime import datetime, timezone
     payload: dict = {"analyzed": analyzed}
     if analyzed:
         payload["analyzed_at"] = datetime.now(timezone.utc).isoformat()
-    client.table("documents").update(payload).eq("id", doc_id).execute()
+    await _run(client.table("documents").update(payload).eq("id", doc_id).execute)
 
 
 async def get_principles(
@@ -64,13 +74,13 @@ async def get_principles(
         query = query.eq("category", category)
     if source is not None:
         query = query.eq("source", source)
-    response = query.limit(limit).execute()
+    response = await _run(query.limit(limit).execute)
     return response.data
 
 
 async def create_principle(data: dict) -> dict:
     client = get_client()
-    response = client.table("principles").insert(data).execute()
+    response = await _run(client.table("principles").insert(data).execute)
     return response.data[0]
 
 
@@ -81,21 +91,20 @@ async def update_principle_confidence(
     times_failed: int,
 ) -> None:
     client = get_client()
-    from datetime import datetime, timezone
-    client.table("principles").update({
+    await _run(client.table("principles").update({
         "confidence_score": score,
         "times_applied": times_applied,
         "times_failed": times_failed,
         "updated_at": datetime.now(timezone.utc).isoformat(),
-    }).eq("id", principle_id).execute()
+    }).eq("id", principle_id).execute)
 
 
 async def create_analysis_job(document_id: str) -> dict:
     client = get_client()
-    response = client.table("analysis_jobs").insert({
+    response = await _run(client.table("analysis_jobs").insert({
         "document_id": document_id,
         "status": "pending",
-    }).execute()
+    }).execute)
     return response.data[0]
 
 
@@ -106,7 +115,6 @@ async def update_analysis_job(
     error: Optional[str] = None,
 ) -> None:
     client = get_client()
-    from datetime import datetime, timezone
     payload: dict = {"status": status, "principles_created": principals_created}
     if status == "running":
         payload["started_at"] = datetime.now(timezone.utc).isoformat()
@@ -114,4 +122,4 @@ async def update_analysis_job(
         payload["completed_at"] = datetime.now(timezone.utc).isoformat()
     if error is not None:
         payload["error_message"] = error
-    client.table("analysis_jobs").update(payload).eq("id", job_id).execute()
+    await _run(client.table("analysis_jobs").update(payload).eq("id", job_id).execute)

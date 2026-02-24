@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import sys
 import os
@@ -118,28 +119,44 @@ async def run_learning_engine(project_id: Optional[str] = None) -> dict:
 
         logger.info("run_learning_engine: processing %d jobs", len(pending_jobs))
 
+        import time as _time
+        _t0 = _time.perf_counter()
+
+        doc_ids = [j["document_id"] for j in pending_jobs]
+        docs_resp = client.table("documents").select("*").in_("id", doc_ids).execute()
+        docs_by_id = {d["id"]: d for d in (docs_resp.data or [])}
+
+        async def process_single_job(job: dict) -> dict:
+            doc = docs_by_id.get(job["document_id"])
+            if not doc:
+                logger.warning("run_learning_engine: document %s not found for job %s", job["document_id"], job["id"])
+                return {"status": "skipped", "job_id": job["id"]}
+            return await process_document(doc, job["id"])
+
+        raw_results = await asyncio.gather(
+            *[process_single_job(j) for j in pending_jobs],
+            return_exceptions=True,
+        )
+
         total_created = 0
         total_updated = 0
         total_failed = 0
         job_results: list[dict] = []
 
-        for job in pending_jobs:
-            job_id = job["id"]
-            document_id = job["document_id"]
+        for r in raw_results:
+            if isinstance(r, Exception):
+                logger.error("run_learning_engine: job raised exception: %s", r)
+                job_results.append({"status": "failed", "error": str(r)})
+            else:
+                job_results.append(r)
+                if r.get("status") == "completed":
+                    total_created += r.get("created", 0)
+                    total_updated += r.get("updated", 0)
+                    total_failed += r.get("failed", 0)
 
-            doc_resp = client.table("documents").select("*").eq("id", document_id).execute()
-            if not doc_resp.data:
-                logger.warning("run_learning_engine: document %s not found for job %s", document_id, job_id)
-                continue
-
-            document = doc_resp.data[0]
-            result = await process_document(document, job_id)
-            job_results.append(result)
-
-            if result.get("status") == "completed":
-                total_created += result.get("created", 0)
-                total_updated += result.get("updated", 0)
-                total_failed += result.get("failed", 0)
+        elapsed = _time.perf_counter() - _t0
+        logger.info("run_learning_engine: %d jobs in %.2fs — created=%d updated=%d failed=%d",
+                    len(pending_jobs), elapsed, total_created, total_updated, total_failed)
 
         return {
             "processed": len(job_results),
