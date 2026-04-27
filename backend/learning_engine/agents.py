@@ -8,6 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from learning_engine.extraction_strategy import extract_with_3x3
 from learning_engine.document_router import get_agents_for_doc_type, prepare_content_for_agent
+from utils.errors import wrap_upstream_errors
 
 logger = logging.getLogger("contextflow")
 
@@ -93,52 +94,40 @@ Extract 2-8 error-solution pairs. Focus on concrete, reproducible problems with 
 Return [] if no clear error-solution pairs found."""
 
 
+@wrap_upstream_errors("agent1_extract_patterns")
 async def agent1_extract_patterns(content: str) -> list[dict]:
-    try:
-        return await extract_with_3x3(
-            content=content,
-            system_prompt=_SYSTEM_PATTERN,
-            user_prompt_template=_USER_PATTERN,
-        )
-    except Exception as exc:
-        logger.error("agent1_extract_patterns failed: %s", exc)
-        return []
+    return await extract_with_3x3(
+        content=content,
+        system_prompt=_SYSTEM_PATTERN,
+        user_prompt_template=_USER_PATTERN,
+    )
 
 
+@wrap_upstream_errors("agent2_analyze_decisions")
 async def agent2_analyze_decisions(content: str) -> list[dict]:
-    try:
-        return await extract_with_3x3(
-            content=content,
-            system_prompt=_SYSTEM_DECISION,
-            user_prompt_template=_USER_DECISION,
-        )
-    except Exception as exc:
-        logger.error("agent2_analyze_decisions failed: %s", exc)
-        return []
+    return await extract_with_3x3(
+        content=content,
+        system_prompt=_SYSTEM_DECISION,
+        user_prompt_template=_USER_DECISION,
+    )
 
 
+@wrap_upstream_errors("agent3_synthesize_lessons")
 async def agent3_synthesize_lessons(content: str) -> list[dict]:
-    try:
-        return await extract_with_3x3(
-            content=content,
-            system_prompt=_SYSTEM_LESSON,
-            user_prompt_template=_USER_LESSON,
-        )
-    except Exception as exc:
-        logger.error("agent3_synthesize_lessons failed: %s", exc)
-        return []
+    return await extract_with_3x3(
+        content=content,
+        system_prompt=_SYSTEM_LESSON,
+        user_prompt_template=_USER_LESSON,
+    )
 
 
+@wrap_upstream_errors("agent4_analyze_chat")
 async def agent4_analyze_chat(content: str) -> list[dict]:
-    try:
-        return await extract_with_3x3(
-            content=content,
-            system_prompt=_SYSTEM_CHAT,
-            user_prompt_template=_USER_CHAT,
-        )
-    except Exception as exc:
-        logger.error("agent4_analyze_chat failed: %s", exc)
-        return []
+    return await extract_with_3x3(
+        content=content,
+        system_prompt=_SYSTEM_CHAT,
+        user_prompt_template=_USER_CHAT,
+    )
 
 
 _AGENT_MAP = {
@@ -163,13 +152,9 @@ async def run_agents_for_document(
     valid_agents = [(name, _AGENT_MAP[name]) for name in agent_names if name in _AGENT_MAP]
 
     async def run_agent(name: str, fn) -> tuple[str, list[dict]]:
-        try:
-            items = await fn(prepared_content)
-            logger.info("Agent %s: extracted %d items", name, len(items))
-            return name, items
-        except Exception as exc:
-            logger.error("Agent %s failed: %s", name, exc)
-            return name, []
+        items = await fn(prepared_content)
+        logger.info("Agent %s: extracted %d items", name, len(items))
+        return name, items
 
     pairs = await asyncio.gather(*[run_agent(n, f) for n, f in valid_agents])
     results = dict(pairs)

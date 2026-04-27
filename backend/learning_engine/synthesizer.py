@@ -16,6 +16,7 @@ from utils.supabase_client import (
 )
 from utils.embeddings import generate_embedding, generate_embeddings_batch
 from utils.config import MVP_USER_ID
+from utils.errors import wrap_upstream_errors
 
 logger = logging.getLogger("contextflow")
 
@@ -43,19 +44,16 @@ def calculate_initial_confidence(
     return min(base + boost, 0.90)
 
 
+@wrap_upstream_errors("find_similar_principle")
 async def find_similar_principle(
     content: str,
     category: str,
     threshold: float = 0.92,
 ) -> Optional[dict]:
-    try:
-        embedding = await generate_embedding(content)
-        if not embedding:
-            return None
-        return await _search_similar_by_embedding(embedding, category, threshold)
-    except Exception as exc:
-        logger.error("find_similar_principle failed: %s", exc)
+    embedding = await generate_embedding(content)
+    if not embedding:
         return None
+    return await _search_similar_by_embedding(embedding, category, threshold)
 
 
 async def _search_similar_by_embedding(

@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from typing import Optional
 
 from learning_engine.together_client import call_model_n_times, ALL_MODELS
+from utils.errors import wrap_upstream_errors
 
 logger = logging.getLogger("contextflow")
 
@@ -66,6 +67,7 @@ def merge_model_results(results_per_model: dict[str, list[dict]]) -> list[dict]:
         return []
 
 
+@wrap_upstream_errors("extract_with_3x3")
 async def extract_with_3x3(
     content: str,
     system_prompt: str,
@@ -73,31 +75,27 @@ async def extract_with_3x3(
     models: Optional[list[str]] = None,
     runs_per_model: int = 1,
 ) -> list[dict]:
-    try:
-        if models is None:
-            models = ALL_MODELS
+    if models is None:
+        models = ALL_MODELS
 
-        user_prompt = user_prompt_template.format(content=content)
+    user_prompt = user_prompt_template.format(content=content)
 
-        async def run_model(model: str) -> tuple[str, list[dict]]:
-            raw_results = await call_model_n_times(
-                model=model,
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                n=runs_per_model,
-                temperature=0.4,
-            )
-            parsed = [parse_json_response(r) for r in raw_results]
-            best = vote_on_extractions(parsed)
-            logger.info("3x3: %s extracted %d items", model.split("/")[-1], len(best))
-            return model, best
+    async def run_model(model: str) -> tuple[str, list[dict]]:
+        raw_results = await call_model_n_times(
+            model=model,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            n=runs_per_model,
+            temperature=0.4,
+        )
+        parsed = [parse_json_response(r) for r in raw_results]
+        best = vote_on_extractions(parsed)
+        logger.info("3x3: %s extracted %d items", model.split("/")[-1], len(best))
+        return model, best
 
-        pairs = await asyncio.gather(*[run_model(m) for m in models])
-        results_per_model: dict[str, list[dict]] = dict(pairs)
+    pairs = await asyncio.gather(*[run_model(m) for m in models])
+    results_per_model: dict[str, list[dict]] = dict(pairs)
 
-        final = merge_model_results(results_per_model)
-        logger.info("3x3: final merged result = %d unique items", len(final))
-        return final
-    except Exception as exc:
-        logger.error("extract_with_3x3 failed: %s", exc)
-        return []
+    final = merge_model_results(results_per_model)
+    logger.info("3x3: final merged result = %d unique items", len(final))
+    return final

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 import sys
 import os
@@ -13,18 +12,11 @@ from openai import AsyncOpenAI
 
 from utils.config import OPENAI_API_KEY, MVP_USER_ID
 from utils.supabase_client import get_client, get_projects
+from utils.errors import wrap_upstream_errors, parse_json_or_raise
 
 logger = logging.getLogger("contextflow")
 
 _openai_client = AsyncOpenAI(api_key=OPENAI_API_KEY)
-
-_FALLBACK_INTENT_KWARGS = dict(
-    query_type="general",
-    category="other",
-    scope="general",
-    project_id=None,
-    confidence=0.5,
-)
 
 
 @dataclass
@@ -36,6 +28,7 @@ class Intent:
     confidence: float
 
 
+@wrap_upstream_errors("classify_intent")
 async def classify_intent(
     query: str,
     project_id_hint: Optional[str] = None,
@@ -64,35 +57,31 @@ Rules:
 - scope "all_projects": asks about patterns across projects
 - scope "general": asks for general best practices"""
 
-    try:
-        response = await _openai_client.chat.completions.create(
-            model="gpt-4o-mini",
-            temperature=0.1,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-        )
-        raw = response.choices[0].message.content or ""
-        parsed = json.loads(raw)
-        intent = Intent(
-            query_type=parsed.get("query_type", "general"),
-            category=parsed.get("category", "other"),
-            scope=parsed.get("scope", "general"),
-            project_id=project_id_hint,
-            confidence=float(parsed.get("confidence", 0.5)),
-        )
-        logger.info(
-            "classify_intent result: type=%s category=%s scope=%s confidence=%.2f",
-            intent.query_type,
-            intent.category,
-            intent.scope,
-            intent.confidence,
-        )
-        return intent
-    except Exception as exc:
-        logger.error("classify_intent failed: %s — using fallback", exc)
-        return Intent(**_FALLBACK_INTENT_KWARGS)
+    response = await _openai_client.chat.completions.create(
+        model="gpt-4o-mini",
+        temperature=0.1,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+    )
+    raw = response.choices[0].message.content or ""
+    parsed = parse_json_or_raise(raw, label="classify_intent")
+    intent = Intent(
+        query_type=parsed.get("query_type", "general"),
+        category=parsed.get("category", "other"),
+        scope=parsed.get("scope", "general"),
+        project_id=project_id_hint,
+        confidence=float(parsed.get("confidence", 0.5)),
+    )
+    logger.info(
+        "classify_intent result: type=%s category=%s scope=%s confidence=%.2f",
+        intent.query_type,
+        intent.category,
+        intent.scope,
+        intent.confidence,
+    )
+    return intent
 
 
 async def detect_project_from_query(query: str) -> Optional[str]:
