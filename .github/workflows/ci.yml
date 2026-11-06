@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - main
-      - codex/contextflow-pr1-baseline
 
 permissions:
   contents: read
