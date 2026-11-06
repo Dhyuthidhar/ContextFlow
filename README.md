@@ -27,6 +27,13 @@ RUN_LIVE_INTEGRATION=1 ./run_tests.sh
 
 `RUN_LIVE_INTEGRATION=1` is intentionally opt-in because it requires configured external services and may consume provider resources. It must not be used against production without separate authorization.
 
+The frontend API routes use the current checkout by default. Set these variables when Python or the backend live elsewhere:
+
+```bash
+CONTEXTFLOW_PYTHON=/path/to/venv/bin/python
+CONTEXTFLOW_BACKEND_DIR=/path/to/ContextFlow/backend
+```
+
 ## Current baseline boundary
 
 This baseline proves the existing upload, query-scope forwarding, and MCP JSON-RPC contracts with deterministic fixtures. It does not claim that V1 document identity/versioning, approvals, decision authority, audit lineage, or approved-context retrieval are implemented; those remain later approved PRs.

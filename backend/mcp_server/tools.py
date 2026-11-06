@@ -139,12 +139,16 @@ async def handle_upload_document(arguments: dict[str, Any]) -> dict[str, Any]:
 
 
 async def handle_analyze_project(arguments: dict[str, Any]) -> dict[str, Any]:
-    from learning_engine.engine import run_learning_engine
-
     try:
         project_id = arguments.get("project_id", "").strip()
         if not project_id:
             return {"success": False, "error": "project_id is required"}
+
+        batch_size = int(arguments.get("batch_size", 3))
+        if batch_size < 1:
+            return {"success": False, "error": "batch_size must be at least 1"}
+
+        from learning_engine.engine import run_learning_engine
 
         client = get_client()
         unanalyzed = (
@@ -161,7 +165,6 @@ async def handle_analyze_project(arguments: dict[str, Any]) -> dict[str, Any]:
                 "data": {"message": "No unanalyzed documents found", "count": 0},
             }
 
-        batch_size = int(arguments.get("batch_size", 3))
         batch = unanalyzed.data[:batch_size]
         remaining = max(0, len(unanalyzed.data) - batch_size)
 

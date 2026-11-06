@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import sys
 import types
+from pathlib import Path
 from types import SimpleNamespace
 
 from mcp_server import tools
@@ -66,5 +67,13 @@ def test_storage_query_passes_project_scope_to_database_rpc(monkeypatch) -> None
 
     assert result[0]["project_id"] == "project-a"
     assert rpc_calls[0][0] == "search_document_chunks"
+    assert rpc_calls[0][1]["user_id_filter"] == storage1_query.MVP_USER_ID
     assert rpc_calls[0][1]["project_id_filter"] == "project-a"
     assert rpc_calls[0][1]["match_count"] == 7
+
+
+def test_vector_search_sql_enforces_user_and_project_scope() -> None:
+    migration = Path(__file__).resolve().parents[2] / "supabase/migrations/005_vector_search_functions.sql"
+    sql = migration.read_text()
+    assert "AND p.user_id = user_id_filter" in sql
+    assert "AND (project_id_filter IS NULL OR p.id = project_id_filter)" in sql

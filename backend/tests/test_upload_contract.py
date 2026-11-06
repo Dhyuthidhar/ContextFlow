@@ -128,3 +128,9 @@ def test_upload_rejects_invalid_document_category() -> None:
     result = asyncio.run(tools.handle_upload_document(valid_arguments(doc_category="contract")))
     assert result["success"] is False
     assert "doc_category must be one of" in result["error"]
+
+
+def test_analyze_rejects_non_positive_batch_before_service_access(monkeypatch) -> None:
+    monkeypatch.setattr(tools, "get_client", lambda: (_ for _ in ()).throw(AssertionError("service accessed")))
+    result = asyncio.run(tools.handle_analyze_project({"project_id": PROJECT_ID, "batch_size": 0}))
+    assert result == {"success": False, "error": "batch_size must be at least 1"}

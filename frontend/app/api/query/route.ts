@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { spawn } from 'child_process'
+import { BACKEND_DIR, PYTHON } from '@/lib/backend-process'
 
 function runMCP(payload: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const proc = spawn(
-      '/Users/sssd/Documents/ContextFlow/backend/.venv/bin/python3',
+      PYTHON,
       ['-m', 'mcp_server.server'],
       {
-        cwd: '/Users/sssd/Documents/ContextFlow/backend',
+        cwd: BACKEND_DIR,
         stdio: ['pipe', 'pipe', 'pipe'],
       }
     )

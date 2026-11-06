@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { spawnSync } from 'child_process'
+import { BACKEND_DIR, PYTHON } from '@/lib/backend-process'
 
 export const maxDuration = 60
-
-const PYTHON = '/Users/sssd/Documents/ContextFlow/backend/.venv/bin/python3'
-const BACKEND_DIR = '/Users/sssd/Documents/ContextFlow/backend'
 
 export async function POST(req: NextRequest) {
   try {
@@ -63,7 +61,12 @@ export async function POST(req: NextRequest) {
     }
 
     if (!data.success) {
-      return NextResponse.json({ error: data.error ?? 'Upload failed' }, { status: 500 })
+      return NextResponse.json({
+        error: data.error ?? 'Upload failed',
+        partial: data.data?.partial ?? false,
+        document_id: data.data?.document_id,
+        chunk_count: data.data?.chunk_count,
+      }, { status: 500 })
     }
 
     return NextResponse.json({

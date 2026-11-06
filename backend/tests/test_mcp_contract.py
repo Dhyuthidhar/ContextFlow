@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import socket
 
 from mcp_server import server
 
@@ -43,3 +44,12 @@ def test_tools_call_reports_missing_required_argument_without_loading_services()
 def test_unknown_tool_is_a_structured_failure() -> None:
     result = run(server.dispatch("contextflow_unknown", {}))
     assert result == {"error": "Unknown tool: contextflow_unknown", "success": False}
+
+
+def test_deterministic_suite_blocks_network_access() -> None:
+    try:
+        socket.create_connection(("example.invalid", 443))
+    except AssertionError as exc:
+        assert str(exc) == "Network access is forbidden in deterministic tests"
+    else:
+        raise AssertionError("network guard did not run")

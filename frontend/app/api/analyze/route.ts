@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { spawnSync } from 'child_process'
+import { BACKEND_DIR, PYTHON } from '@/lib/backend-process'
 
 export const maxDuration = 300
-
-const PYTHON = '/Users/sssd/Documents/ContextFlow/backend/.venv/bin/python3'
-const BACKEND_DIR = '/Users/sssd/Documents/ContextFlow/backend'
 
 export async function POST(req: NextRequest) {
   try {
