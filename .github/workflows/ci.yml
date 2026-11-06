@@ -92,6 +92,14 @@ jobs:
       - name: Run design-system acceptance checks
         working-directory: frontend
         run: npm run test:design-system
+      - name: Upload visual differences
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: design-system-visual-differences
+          path: frontend/test-results
+          if-no-files-found: error
+          retention-days: 7
 
   secrets:
     name: Secret scan
