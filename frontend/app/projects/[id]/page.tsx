@@ -29,8 +29,8 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(days / 30)}mo ago`
 }
 
-export default async function ProjectDetailPage({ params }: { params: { id: string } }) {
-  const { id } = params
+export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
 
   const [projectRes, docsRes, principlesRes] = await Promise.all([
     supabaseAdmin.from('projects').select('*').eq('id', id).single(),

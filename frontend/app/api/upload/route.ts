@@ -41,9 +41,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Backend error: ${result.stderr?.slice(0, 300)}` }, { status: 500 })
     }
 
-    let parsed: any
+    let parsed: { result?: { content?: Array<{ text?: string }> } }
     try {
-      parsed = JSON.parse(result.stdout.trim())
+      parsed = JSON.parse(result.stdout.trim()) as typeof parsed
     } catch {
       return NextResponse.json({ error: 'Invalid response from backend' }, { status: 500 })
     }
@@ -53,9 +53,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Empty response from backend' }, { status: 500 })
     }
 
-    let data: any
+    let data: {
+      success?: boolean
+      error?: string
+      data?: { partial?: boolean; document_id?: string; chunk_count?: number }
+    }
     try {
-      data = JSON.parse(text)
+      data = JSON.parse(text) as typeof data
     } catch {
       return NextResponse.json({ error: 'Could not parse backend result' }, { status: 500 })
     }

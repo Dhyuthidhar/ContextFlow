@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import socket
 import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -11,16 +12,20 @@ import pytest
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_DIR))
 
-# Deterministic placeholders satisfy configuration at import time. Tests replace
-# every service boundary before exercising application code.
-os.environ.setdefault("SUPABASE_URL", "http://127.0.0.1:54321")
-os.environ.setdefault("SUPABASE_SERVICE_KEY", "test-service-key")
-os.environ.setdefault("SUPABASE_ANON_KEY", "test-anon-key")
-os.environ.setdefault("OPENAI_API_KEY", "test-openai-key")
-os.environ.setdefault("TOGETHER_API_KEY", "test-together-key")
-os.environ.setdefault("MVP_USER_ID", "123e4567-e89b-12d3-a456-426614174000")
-os.environ.setdefault("ENVIRONMENT", "test")
-os.environ.setdefault("LOG_LEVEL", "CRITICAL")
+# Inject a non-secret configuration module before application imports. This keeps
+# offline tests independent from environment credentials while preserving the
+# production configuration contract used by application modules.
+if os.environ.get("RUN_LIVE_INTEGRATION") != "1":
+    test_config = types.ModuleType("utils.config")
+    test_config.SUPABASE_URL = "https://offline.invalid"
+    test_config.SUPABASE_SERVICE_KEY = "unused"
+    test_config.SUPABASE_ANON_KEY = "unused"
+    test_config.OPENAI_API_KEY = "unused"
+    test_config.TOGETHER_API_KEY = "unused"
+    test_config.MVP_USER_ID = "123e4567-e89b-12d3-a456-426614174000"
+    test_config.ENVIRONMENT = "test"
+    test_config.LOG_LEVEL = "CRITICAL"
+    sys.modules["utils.config"] = test_config
 
 
 @pytest.fixture(autouse=True)

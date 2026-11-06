@@ -3,9 +3,9 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const projectId = params.id
+  const projectId = (await params).id
   if (!projectId) {
     return NextResponse.json({ error: 'Missing project id' }, { status: 400 })
   }
