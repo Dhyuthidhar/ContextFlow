@@ -69,6 +69,12 @@ async def handle_upload_document(arguments: dict[str, Any]) -> dict[str, Any]:
     doc_category = arguments["doc_category"]
     content = arguments["content"]
 
+    if file_type not in _VALID_FILE_TYPES:
+        return {
+            "success": False,
+            "error": f"file_type must be one of: {sorted(_VALID_FILE_TYPES)}",
+        }
+
     valid_categories = ["prd", "brd", "architecture", "chat", "other"]
     if doc_category not in valid_categories:
         return {"success": False, "error": f"doc_category must be one of: {valid_categories}"}
@@ -103,6 +109,20 @@ async def handle_upload_document(arguments: dict[str, Any]) -> dict[str, Any]:
         cleaned = clean_extracted_text(content)
         chunk_count = await process_and_store_chunks(document_id, cleaned)
 
+        if chunk_count <= 0:
+            return {
+                "success": False,
+                "error": "Document was stored but no searchable chunks were created",
+                "data": {
+                    "document_id": document_id,
+                    "filename": filename,
+                    "storage_path": storage_path,
+                    "chunk_count": chunk_count,
+                    "char_count": len(cleaned),
+                    "partial": True,
+                },
+            }
+
         return {
             "success": True,
             "data": {
@@ -119,12 +139,16 @@ async def handle_upload_document(arguments: dict[str, Any]) -> dict[str, Any]:
 
 
 async def handle_analyze_project(arguments: dict[str, Any]) -> dict[str, Any]:
-    from learning_engine.engine import run_learning_engine
-
     try:
         project_id = arguments.get("project_id", "").strip()
         if not project_id:
             return {"success": False, "error": "project_id is required"}
+
+        batch_size = int(arguments.get("batch_size", 3))
+        if batch_size < 1:
+            return {"success": False, "error": "batch_size must be at least 1"}
+
+        from learning_engine.engine import run_learning_engine
 
         client = get_client()
         unanalyzed = (
@@ -141,7 +165,6 @@ async def handle_analyze_project(arguments: dict[str, Any]) -> dict[str, Any]:
                 "data": {"message": "No unanalyzed documents found", "count": 0},
             }
 
-        batch_size = int(arguments.get("batch_size", 3))
         batch = unanalyzed.data[:batch_size]
         remaining = max(0, len(unanalyzed.data) - batch_size)
 

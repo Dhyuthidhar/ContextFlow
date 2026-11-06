@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { spawnSync } from 'child_process'
+import { BACKEND_DIR, PYTHON } from '@/lib/backend-process'
 
 export const maxDuration = 60
-
-const PYTHON = '/Users/sssd/Documents/ContextFlow/backend/.venv/bin/python3'
-const BACKEND_DIR = '/Users/sssd/Documents/ContextFlow/backend'
 
 export async function POST(req: NextRequest) {
   try {
@@ -43,9 +41,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Backend error: ${result.stderr?.slice(0, 300)}` }, { status: 500 })
     }
 
-    let parsed: any
+    let parsed: { result?: { content?: Array<{ text?: string }> } }
     try {
-      parsed = JSON.parse(result.stdout.trim())
+      parsed = JSON.parse(result.stdout.trim()) as typeof parsed
     } catch {
       return NextResponse.json({ error: 'Invalid response from backend' }, { status: 500 })
     }
@@ -55,15 +53,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Empty response from backend' }, { status: 500 })
     }
 
-    let data: any
+    let data: {
+      success?: boolean
+      error?: string
+      data?: { partial?: boolean; document_id?: string; chunk_count?: number }
+    }
     try {
-      data = JSON.parse(text)
+      data = JSON.parse(text) as typeof data
     } catch {
       return NextResponse.json({ error: 'Could not parse backend result' }, { status: 500 })
     }
 
     if (!data.success) {
-      return NextResponse.json({ error: data.error ?? 'Upload failed' }, { status: 500 })
+      return NextResponse.json({
+        error: data.error ?? 'Upload failed',
+        partial: data.data?.partial ?? false,
+        document_id: data.data?.document_id,
+        chunk_count: data.data?.chunk_count,
+      }, { status: 500 })
     }
 
     return NextResponse.json({

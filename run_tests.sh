@@ -1,44 +1,34 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
-echo "================================================"
-echo "  ContextFlow Integration Test Suite"
-echo "================================================"
-echo ""
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PYTHON_BIN="${PYTHON_BIN:-python3}"
 
-# Colors
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-NC='\033[0m'
+export PYTHONDONTWRITEBYTECODE=1
 
-# ── BACKEND TESTS ──
-echo ">>> Running Python backend tests..."
-cd /Users/sssd/Documents/ContextFlow/backend
-source .venv/bin/activate
+echo "ContextFlow deterministic baseline tests"
+echo "Repository: ${REPO_DIR}"
+echo "Python: $(${PYTHON_BIN} --version 2>&1)"
 
-python3 tests/test_integration.py
-if [ $? -eq 0 ]; then
-  echo -e "${GREEN}Backend tests completed${NC}"
-else
-  echo -e "${RED}Backend tests had failures${NC}"
+"${PYTHON_BIN}" -m pytest \
+  "${REPO_DIR}/backend/tests" \
+  -m "not live_integration" \
+  -p no:cacheprovider
+
+if [[ "${SKIP_FRONTEND:-0}" != "1" ]]; then
+  if [[ ! -x "${REPO_DIR}/frontend/node_modules/.bin/tsc" ]]; then
+    echo "Frontend dependencies are missing. Run 'npm ci' in frontend/ or set SKIP_FRONTEND=1." >&2
+    exit 1
+  fi
+  (
+    cd "${REPO_DIR}/frontend"
+    npm run typecheck
+  )
 fi
 
-# ── FRONTEND TESTS ──
-echo ""
-echo ">>> Running Playwright E2E tests..."
-echo "    (Make sure 'npm run dev' is running in another terminal)"
-echo ""
-cd /Users/sssd/Documents/ContextFlow/frontend
-
-npx playwright test --reporter=list
-if [ $? -eq 0 ]; then
-  echo -e "${GREEN}E2E tests passed${NC}"
-else
-  echo -e "${RED}E2E tests had failures${NC}"
+if [[ "${RUN_LIVE_INTEGRATION:-0}" == "1" ]]; then
+  "${PYTHON_BIN}" -m pytest \
+    "${REPO_DIR}/backend/tests" \
+    -m live_integration \
+    -p no:cacheprovider
 fi
-
-echo ""
-echo "================================================"
-echo "  Test run complete"
-echo "  Playwright report: frontend/playwright-report/index.html"
-echo "================================================"

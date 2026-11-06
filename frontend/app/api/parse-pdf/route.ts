@@ -3,6 +3,7 @@ import { spawnSync } from 'child_process'
 import { writeFileSync, unlinkSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
+import { PYTHON } from '@/lib/backend-process'
 
 export async function POST(req: NextRequest) {
   const tempPath = join(tmpdir(), `cf_${Date.now()}.pdf`)
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
     writeFileSync(tempPath, buffer)
 
     const result = spawnSync(
-      '/Users/sssd/Documents/ContextFlow/backend/.venv/bin/python3',
+      PYTHON,
       ['-c', `
 import pypdf, json, sys
 reader = pypdf.PdfReader("${tempPath}")

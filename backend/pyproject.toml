@@ -7,6 +7,9 @@ description = "ContextFlow AI context management backend"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "live_integration: requires configured external Supabase and AI services",
+]
 
 [tool.pyright]
 pythonVersion = "3.11"
