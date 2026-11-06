@@ -71,7 +71,7 @@ export default function UploadPage() {
       })
   }, [id])
 
-  function addFiles(files: FileList | File[]) {
+  const addFiles = useCallback((files: FileList | File[]) => {
     const arr = Array.from(files)
     const valid: FileEntry[] = []
     const seenInBatch = new Set<string>()
@@ -98,7 +98,7 @@ export default function UploadPage() {
       return [...prev, ...valid]
     })
     setAllDone(false)
-  }
+  }, [existingFilenames])
 
   function removeEntry(entryId: string) {
     setEntries((prev) => prev.filter((e) => e.id !== entryId))
@@ -112,7 +112,7 @@ export default function UploadPage() {
     e.preventDefault()
     setDragging(false)
     if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files)
-  }, [])
+  }, [addFiles])
 
   const onDragOver = (e: React.DragEvent) => { e.preventDefault(); setDragging(true) }
   const onDragLeave = () => setDragging(false)
