@@ -26,7 +26,12 @@ export function Dialog({ open, title, description, children, onClose }: DialogPr
   const descriptionId = useId()
   const dialogRef = useRef<HTMLDivElement>(null)
   const previousFocus = useRef<HTMLElement | null>(null)
+  const onCloseRef = useRef(onClose)
   const [portalNode, setPortalNode] = useState<HTMLElement | null>(null)
+
+  useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
 
   useEffect(() => {
     if (!open) return
@@ -64,7 +69,7 @@ export function Dialog({ open, title, description, children, onClose }: DialogPr
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         event.preventDefault()
-        onClose()
+        onCloseRef.current()
         return
       }
 
@@ -97,7 +102,7 @@ export function Dialog({ open, title, description, children, onClose }: DialogPr
       }
       previousFocus.current?.focus()
     }
-  }, [onClose, open, portalNode])
+  }, [open, portalNode])
 
   if (!open || !portalNode) return null
 

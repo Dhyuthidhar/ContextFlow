@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useState } from 'react'
 import {
   Badge,
   Button,
@@ -10,39 +10,54 @@ import {
   Panel,
   RoleOption,
   RoleSelector,
-  SelectField,
-  TextAreaField,
   TextField,
 } from '@/components/ui'
 
-const roles: RoleOption[] = [
+const organizationRoles: RoleOption[] = [
   {
-    id: 'cto-admin',
-    name: 'CTO / Administrator',
-    description: 'Owns internal access and protected product-requirement approvals.',
-    allowedActions: ['Manage project members', 'Approve protected requirement changes', 'Review project audit metadata'],
-    restrictions: ['Cannot replace required client sign-off', 'Cannot deploy through ContextFlow'],
+    id: 'owner',
+    name: 'Owner',
+    description: 'Holds final organization authority and protected product-rule approval responsibility.',
+    allowedActions: ['Approve employee accounts', 'Approve Admin role changes', 'Approve protected product-rule changes'],
+    restrictions: ['Cannot replace required client sign-off', 'Cannot bypass audit history'],
+  },
+  {
+    id: 'admin',
+    name: 'Admin',
+    description: 'Operates employee onboarding and project access under Owner-governed organization controls.',
+    allowedActions: ['Approve ordinary employee accounts', 'Assign project access', 'Propose Admin promotion or demotion'],
+    restrictions: ['Admin role changes require Owner approval', 'Cannot approve protected product-rule changes'],
+  },
+  {
+    id: 'member',
+    name: 'Member',
+    description: 'An approved employee identity that receives access only through explicit project grants.',
+    allowedActions: ['Sign in when account is active', 'Receive an assigned project role', 'View their own access state'],
+    restrictions: ['No project access without a grant', 'Cannot approve accounts or organization roles'],
+  },
+]
+
+const projectRoles: RoleOption[] = [
+  {
+    id: 'project-admin',
+    name: 'Project Admin',
+    description: 'Coordinates an assigned project within organization-level access boundaries.',
+    allowedActions: ['Use authorized project context', 'Review project access needs', 'Coordinate project workflows'],
+    restrictions: ['Cannot change organization roles', 'Grant delegation awaits CTO approval'],
   },
   {
     id: 'developer',
     name: 'Developer',
     description: 'Builds against authorized project context and proposes clarifications.',
     allowedActions: ['Read assigned project context', 'Upload authorized sources', 'Propose decisions and changes'],
-    restrictions: ['Cannot manage project access', 'Cannot approve protected changes'],
+    restrictions: ['Cannot manage organization access', 'Cannot approve protected product-rule changes'],
   },
   {
     id: 'reviewer',
-    name: 'Reviewer / Tech Lead',
-    description: 'Reviews evidence, conflicts, and implementation alignment.',
+    name: 'Reviewer',
+    description: 'Reviews evidence, conflicts, and implementation alignment in an assigned project.',
     allowedActions: ['Review assigned project context', 'Classify conflicts', 'Request implementation changes'],
-    restrictions: ['Cannot grant membership', 'Cannot replace CTO approval'],
-  },
-  {
-    id: 'agent',
-    name: 'AI Coding Agent',
-    description: 'Receives task-scoped context through an explicit agent identity.',
-    allowedActions: ['Retrieve granted task context', 'Propose a decision', 'Acknowledge a relevant update'],
-    restrictions: ['Cannot browse ungranted projects', 'Cannot approve or manage members'],
+    restrictions: ['Cannot grant organization membership', 'Cannot approve protected product-rule changes'],
   },
 ]
 
@@ -67,9 +82,11 @@ const statusTone = {
 } as const
 
 export default function DesignSystemPage() {
-  const [selectedRole, setSelectedRole] = useState('developer')
+  const [selectedOrganizationRole, setSelectedOrganizationRole] = useState('member')
+  const [selectedProjectRole, setSelectedProjectRole] = useState('developer')
   const [dialogOpen, setDialogOpen] = useState(false)
-  const closeDialog = useCallback(() => setDialogOpen(false), [])
+  const [reviewNote, setReviewNote] = useState('')
+  const closeDialog = () => setDialogOpen(false)
 
   return (
     <div data-testid="design-system-review" className="cf-ui fixed inset-0 z-[100] overflow-y-auto bg-canvas text-ink">
@@ -149,52 +166,35 @@ export default function DesignSystemPage() {
           <Panel>
             <p className="font-mono text-cf-xs font-bold uppercase tracking-widest text-ink-muted">Authentication pattern</p>
             <h2 id="auth-title" className="mt-cf-2 text-cf-xl font-black">Sign in to ContextFlow</h2>
-            <p className="mt-cf-2 text-cf-sm text-ink-muted">Use your company identity. Public signup is not available.</p>
-            <form className="mt-cf-6 space-y-cf-4" onSubmit={(event) => event.preventDefault()}>
-              <TextField
-                id="review-email"
-                type="email"
-                label="Work email"
-                description="Use the address assigned by your company."
-                placeholder="name@company.example"
-                autoComplete="email"
-                required
-              />
-              <TextField
-                id="review-password"
-                type="password"
-                label="Password"
-                placeholder="Enter your password"
-                autoComplete="current-password"
-                required
-              />
-              <div className="flex flex-wrap gap-cf-3">
-                <Button type="submit">Sign in</Button>
-                <Button variant="quiet">Contact an administrator</Button>
-              </div>
-            </form>
+            <p className="mt-cf-2 text-cf-sm text-ink-muted">
+              Continue with your approved company Google Workspace identity. Public signup is not available.
+            </p>
+            <div className="mt-cf-6 space-y-cf-4">
+              <Button type="button">Continue with Google Workspace</Button>
+              <p className="text-cf-xs text-ink-muted">
+                Google verifies identity; ContextFlow separately enforces account status, roles, and project grants.
+              </p>
+            </div>
           </Panel>
 
           <Panel muted>
-            <p className="font-mono text-cf-xs font-bold uppercase tracking-widest text-ink-muted">Form states</p>
-            <h2 className="mt-cf-2 text-cf-xl font-black">Explicit recovery</h2>
-            <div className="mt-cf-6 space-y-cf-4">
-              <TextField
-                id="review-invalid-email"
-                type="email"
-                label="Work email"
-                defaultValue="personal@example.test"
-                error="Use an approved company email address."
-              />
-              <SelectField id="review-disabled-project" label="Project" disabled defaultValue="">
-                <option value="">Membership required</option>
-              </SelectField>
-              <TextAreaField
-                id="review-reason"
-                label="Access reason"
-                description="Explain what work requires this project."
-                placeholder="I need access to review…"
-              />
+            <p className="font-mono text-cf-xs font-bold uppercase tracking-widest text-ink-muted">Account states</p>
+            <h2 className="mt-cf-2 text-cf-xl font-black">Access remains explicit</h2>
+            <div className="mt-cf-6 space-y-cf-4" data-a11y-contrast>
+              <div className="rounded-cf-sm border-2 border-strong-border bg-warning-surface p-cf-4 text-ink">
+                <Badge tone="warning">Pending account</Badge>
+                <p className="mt-cf-2 text-cf-sm font-bold">Approval required</p>
+                <p className="mt-cf-1 text-cf-xs">
+                  Workspace identity is verified. An Owner or Admin must approve this employee before access begins.
+                </p>
+              </div>
+              <div className="rounded-cf-sm border-2 border-strong-border bg-danger-surface p-cf-4 text-ink">
+                <Badge tone="danger">Disabled account</Badge>
+                <p className="mt-cf-2 text-cf-sm font-bold">ContextFlow access blocked</p>
+                <p className="mt-cf-1 text-cf-xs">
+                  Contact an Owner or Admin. Signing in to Google Workspace does not reactivate ContextFlow access.
+                </p>
+              </div>
             </div>
           </Panel>
         </section>
@@ -202,13 +202,23 @@ export default function DesignSystemPage() {
         <section id="roles" aria-labelledby="roles-title" className="scroll-mt-28">
           <Panel>
             <RoleSelector
-              legend="Choose the employee role"
-              description="Each option explains its intended work, allowed actions, and non-negotiable restrictions. Selection here is a visual contract only; PR 2B will enforce authorization."
-              name="review-role"
-              roles={roles}
-              value={selectedRole}
-              onChange={setSelectedRole}
+              legend="Choose the organization role"
+              description="Organization authority is separate from project work. Admin promotion or demotion takes effect only after Owner approval."
+              name="review-organization-role"
+              roles={organizationRoles}
+              value={selectedOrganizationRole}
+              onChange={setSelectedOrganizationRole}
             />
+            <div className="mt-cf-8 border-t-2 border-strong-border pt-cf-6">
+              <RoleSelector
+                legend="Choose the project role"
+                description="Project roles apply only to explicitly granted projects and never confer organization-level authority. Exact Project Admin delegation remains a CTO decision."
+                name="review-project-role"
+                roles={projectRoles}
+                value={selectedProjectRole}
+                onChange={setSelectedProjectRole}
+              />
+            </div>
             <p id="roles-title" className="sr-only">Role selection</p>
           </Panel>
         </section>
@@ -275,6 +285,15 @@ export default function DesignSystemPage() {
       >
         <div className="rounded-cf-sm border-2 border-strong-border bg-warning-surface p-cf-3 text-cf-sm">
           Client sign-off may still be required. CTO approval does not replace an external contractual obligation.
+        </div>
+        <div className="mt-cf-4">
+          <TextField
+            id="review-dialog-note"
+            label="Review note"
+            description="Typing here rerenders the parent preview without moving focus."
+            value={reviewNote}
+            onChange={(event) => setReviewNote(event.target.value)}
+          />
         </div>
         <div className="mt-cf-6 flex flex-wrap justify-end gap-cf-3">
           <Button variant="quiet" onClick={closeDialog}>Cancel</Button>

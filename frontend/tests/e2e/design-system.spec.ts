@@ -6,9 +6,26 @@ test.beforeEach(async ({ page }) => {
 })
 
 test('exposes labelled component contracts and readable status contrast', async ({ page }) => {
-  await expect(page.getByLabel('Work email', { exact: true }).first()).toBeVisible()
-  await expect(page.getByRole('group', { name: 'Choose the employee role' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Continue with Google Workspace' })).toBeVisible()
+  await expect(page.locator('input[type="password"]')).toHaveCount(0)
+  await expect(page.getByText('Pending account', { exact: true })).toBeVisible()
+  await expect(page.getByText('Disabled account', { exact: true })).toBeVisible()
+  await expect(page.getByRole('group', { name: 'Choose the organization role' })).toBeVisible()
+  await expect(page.getByRole('group', { name: 'Choose the project role' })).toBeVisible()
   await expect(page.getByRole('table', { name: 'Representative employee access approvals' })).toBeVisible()
+
+  for (const roleName of ['Owner', 'Admin', 'Member', 'Project Admin', 'Developer', 'Reviewer']) {
+    await expect(page.getByRole('radio', { name: new RegExp(`^${roleName}`) })).toHaveCount(1)
+  }
+  await expect(page.locator('label[for="review-organization-role-admin"]')).toContainText(
+    'Admin role changes require Owner approval',
+  )
+  await expect(page.locator('label[for="review-organization-role-owner"]')).toContainText(
+    'Approve protected product-rule changes',
+  )
+  await expect(page.locator('label[for="review-project-role-project-admin"]')).toContainText(
+    'Grant delegation awaits CTO approval',
+  )
 
   const unnamedControls = await page.locator('button, input, select, textarea, a[href]').evaluateAll((elements) => (
     elements.filter((element) => {
@@ -50,9 +67,16 @@ test('exposes labelled component contracts and readable status contrast', async 
 })
 
 test('supports keyboard role selection', async ({ page }) => {
+  const member = page.getByRole('radio', { name: /^Member/ })
+  const owner = page.getByRole('radio', { name: /^Owner/ })
   const developer = page.getByRole('radio', { name: /Developer/ })
-  const reviewer = page.getByRole('radio', { name: /Reviewer \/ Tech Lead/ })
+  const reviewer = page.getByRole('radio', { name: /^Reviewer/ })
 
+  await expect(member).toBeChecked()
+  await owner.focus()
+  await page.keyboard.press('ArrowUp')
+  await expect(member).toBeChecked()
+  await expect(member).toBeFocused()
   await expect(developer).toBeChecked()
   await developer.focus()
   await page.keyboard.press('ArrowDown')
@@ -72,6 +96,14 @@ test('traps dialog focus, closes with Escape, and restores focus', async ({ page
   expect(backgroundIsInert).toBe(true)
   await expect(page.getByRole('button', { name: 'Close Review protected change' })).toBeFocused()
 
+  const reviewNote = page.getByRole('textbox', { name: 'Review note' })
+  await reviewNote.focus()
+  await page.keyboard.type('Evidence checked')
+  await expect(reviewNote).toHaveValue('Evidence checked')
+  await expect(reviewNote).toBeFocused()
+
+  await page.keyboard.press('Shift+Tab')
+  await expect(page.getByRole('button', { name: 'Close Review protected change' })).toBeFocused()
   await page.keyboard.press('Shift+Tab')
   await expect(page.getByRole('button', { name: 'Approve change' })).toBeFocused()
   await page.keyboard.press('Tab')
@@ -94,7 +126,7 @@ test('matches the approved desktop representative baseline', async ({ page }) =>
 
 test('reflows without page-level horizontal overflow at mobile width', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
-  await expect(page.getByRole('group', { name: 'Choose the employee role' })).toBeVisible()
+  await expect(page.getByRole('group', { name: 'Choose the organization role' })).toBeVisible()
 
   const dimensions = await page.evaluate(() => ({
     viewport: window.innerWidth,
@@ -112,4 +144,23 @@ test('reflows without page-level horizontal overflow at mobile width', async ({ 
   await expect(page).toHaveScreenshot('role-selection-mobile.png', {
     animations: 'disabled',
   })
+})
+
+test('keeps controls visible and operable at 200 percent text zoom', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = '200%'
+  })
+
+  const dimensions = await page.evaluate(() => ({
+    viewport: window.innerWidth,
+    document: document.documentElement.scrollWidth,
+  }))
+  expect(dimensions.document).toBeLessThanOrEqual(dimensions.viewport)
+
+  const workspaceButton = page.getByRole('button', { name: 'Continue with Google Workspace' })
+  await workspaceButton.focus()
+  await expect(workspaceButton).toBeFocused()
+  const focusShadow = await workspaceButton.evaluate((element) => getComputedStyle(element).boxShadow)
+  expect(focusShadow).not.toBe('none')
 })

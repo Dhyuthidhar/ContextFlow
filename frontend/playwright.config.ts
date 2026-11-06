@@ -11,10 +11,16 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
   webServer: {
-    command: 'npm run dev',
+    command: 'npm run build && npm run start',
     url: 'http://localhost:3000/design-system',
-    reuseExistingServer: true,
+    reuseExistingServer: false,
     timeout: 120000,
+    env: {
+      NEXT_PUBLIC_SUPABASE_URL: 'https://offline.invalid',
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: 'unused',
+      NEXT_PUBLIC_MVP_USER_ID: '123e4567-e89b-12d3-a456-426614174000',
+      SUPABASE_SERVICE_KEY: 'unused',
+    },
   },
   reporter: [['list'], ['html', { outputFolder: 'playwright-report', open: 'never' }]],
 })

@@ -14,7 +14,7 @@ PR 2A establishes the foundation only. It does not redesign existing dashboard p
 
 ## Existing UI audit — CF-DS-01
 
-The inherited frontend is Next.js 14, React 18, TypeScript, and Tailwind CSS 3. It has no component library and no reusable design-system layer. Tailwind and CSS custom properties are therefore the existing technologies to extend.
+The updated integration baseline is Next.js 15, React 18, TypeScript, and Tailwind CSS 3. It has no component library and no reusable design-system layer. Tailwind and CSS custom properties are therefore the existing technologies to extend.
 
 Confirmed reusable foundations:
 
@@ -129,6 +129,17 @@ All components live in `components/ui`. They are presentation contracts and cont
 - Arrow-key selection follows the browser's native radio behavior.
 - Selection is indicated by text/control state as well as color.
 - Role copy is a product contract for review, not RBAC enforcement. PR 2B owns enforcement.
+- Organization roles (Owner, Admin, Member) and project roles (Project Admin, Developer, Reviewer) are presented as separate grants.
+- An Admin may propose promotion or demotion of an Admin, but Owner approval is required before it takes effect.
+- Protected product-rule approval remains Owner-controlled; any required client sign-off remains separate.
+- Exact Project Admin delegation is still a CTO decision and is identified as unresolved rather than presented as implemented authority.
+
+### Authentication preview
+
+- The representative sign-in action is Google Workspace SSO; ContextFlow does not collect a password.
+- Workspace identity verification does not itself grant ContextFlow access.
+- Pending and disabled account states explain the next action and preserve the distinction between Google identity and ContextFlow authorization.
+- This PR implements presentation only. OIDC, sessions, account transitions, and authorization remain later security slices.
 
 ## Responsive behavior
 
@@ -150,6 +161,7 @@ Relevant frontend tasks are not done until:
 - Color is never the only carrier of status, selection, permission, or error.
 - Reduced-motion preference is honored.
 - Focused Playwright checks cover keyboard selection, dialog focus behavior, responsive overflow, and representative screenshots.
+- Parent rerenders with a new dialog callback do not reset focused input or rebuild the modal lifecycle.
 - Manual review covers keyboard-only navigation, zoom, responsive reflow, and contrast combinations that automated checks cannot fully prove.
 
 ## Content and tone
