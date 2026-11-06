@@ -5,7 +5,8 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Force unbuffered stdout — critical for MCP stdio transport
-sys.stdout.reconfigure(line_buffering=True)
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(line_buffering=True)
 
 import asyncio
 import json
@@ -140,7 +141,7 @@ TOOLS: dict[str, dict[str, Any]] = {
                         "description": "Document category",
                     },
                 },
-                "required": ["project_id", "filename", "content", "file_type"],
+                "required": ["project_id", "filename", "content", "file_type", "doc_category"],
             },
         },
     },
@@ -155,6 +156,11 @@ TOOLS: dict[str, dict[str, Any]] = {
                     "project_id": {
                         "type": "string",
                         "description": "ID of the project to analyze",
+                    },
+                    "batch_size": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "Maximum documents to queue in this batch (default 3)",
                     },
                 },
                 "required": ["project_id"],

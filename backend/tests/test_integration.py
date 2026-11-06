@@ -2,6 +2,8 @@ import pytest
 import sys
 import os
 
+pytestmark = pytest.mark.live_integration
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 MVP_PROJECT_ID = "2e8d2de5-4363-4810-ab8c-ce053a14101f"
