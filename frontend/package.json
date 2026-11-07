@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
-    "typecheck": "tsc --noEmit --incremental false"
+    "typecheck": "tsc --noEmit --incremental false",
+    "test:design-system": "playwright test tests/e2e/design-system.spec.ts",
+    "test:design-system:update": "playwright test tests/e2e/design-system.spec.ts --update-snapshots"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.97.0",

@@ -2,6 +2,78 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* Palette primitives from the approved Neobrutalism reference. */
+  --cf-palette-primary: #fdc800;
+  --cf-palette-secondary: #432dd7;
+  --cf-palette-success: #16a34a;
+  --cf-palette-warning: #d97706;
+  --cf-palette-danger: #dc2626;
+  --cf-palette-surface: #fbfbf9;
+  --cf-palette-text: #1c293c;
+
+  /* Semantic colors: components consume these, never palette primitives. */
+  --cf-color-canvas: var(--cf-palette-surface);
+  --cf-color-surface: #ffffff;
+  --cf-color-surface-muted: #f1efe9;
+  --cf-color-ink: var(--cf-palette-text);
+  --cf-color-ink-muted: #4d5868;
+  --cf-color-border: var(--cf-palette-text);
+  --cf-color-action: var(--cf-palette-primary);
+  --cf-color-action-hover: #e5b600;
+  --cf-color-accent: var(--cf-palette-secondary);
+  --cf-color-accent-ink: #ffffff;
+  --cf-color-success: #166534;
+  --cf-color-success-surface: #dcfce7;
+  --cf-color-warning: #92400e;
+  --cf-color-warning-surface: #fef3c7;
+  --cf-color-danger: #991b1b;
+  --cf-color-danger-surface: #fee2e2;
+  --cf-color-disabled: #d9d6ce;
+  --cf-color-disabled-ink: #4d5868;
+  --cf-color-focus: var(--cf-palette-secondary);
+  --cf-color-overlay: rgb(28 41 60 / 72%);
+
+  /* Typography scale: 13 / 15 / 17 / 21 / 27 / 35. */
+  --cf-font-size-xs: 0.8125rem;
+  --cf-font-size-sm: 0.9375rem;
+  --cf-font-size-md: 1.0625rem;
+  --cf-font-size-lg: 1.3125rem;
+  --cf-font-size-xl: 1.6875rem;
+  --cf-font-size-2xl: 2.1875rem;
+  --cf-line-height-tight: 1.2;
+  --cf-line-height-body: 1.5;
+
+  /* Spacing scale: 4 / 8 / 12 / 16 / 24 / 32. */
+  --cf-space-1: 0.25rem;
+  --cf-space-2: 0.5rem;
+  --cf-space-3: 0.75rem;
+  --cf-space-4: 1rem;
+  --cf-space-6: 1.5rem;
+  --cf-space-8: 2rem;
+
+  --cf-border-width: 2px;
+  --cf-border-width-strong: 3px;
+  --cf-radius-sm: 4px;
+  --cf-radius-md: 8px;
+  --cf-shadow-offset: 4px 4px 0 var(--cf-color-border);
+  --cf-shadow-offset-small: 2px 2px 0 var(--cf-color-border);
+  --cf-focus-ring: 0 0 0 3px var(--cf-color-canvas), 0 0 0 6px var(--cf-color-focus);
+  --cf-motion-fast: 120ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cf-ui,
+  .cf-ui *,
+  .cf-ui *::before,
+  .cf-ui *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;
