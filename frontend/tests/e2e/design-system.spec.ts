@@ -159,6 +159,17 @@ test('reflows without page-level horizontal overflow at mobile width', async ({ 
   })
 })
 
+test('keeps mobile anchor targets below the wrapped sticky navigation', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 700 })
+  await page.getByRole('link', { name: 'Roles' }).click()
+
+  const positions = await page.evaluate(() => ({
+    headerBottom: document.querySelector('header')?.getBoundingClientRect().bottom ?? 0,
+    sectionTop: document.querySelector('#roles')?.getBoundingClientRect().top ?? 0,
+  }))
+  expect(positions.sectionTop).toBeGreaterThanOrEqual(positions.headerBottom)
+})
+
 test('keeps controls visible and operable at 200 percent text zoom', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 })
   await page.evaluate(() => {

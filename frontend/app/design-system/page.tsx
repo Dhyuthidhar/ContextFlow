@@ -124,7 +124,7 @@ export default function DesignSystemPage() {
           </Panel>
         </section>
 
-        <section id="foundations" aria-labelledby="foundations-title" className="space-y-cf-4 scroll-mt-28">
+        <section id="foundations" aria-labelledby="foundations-title" className="space-y-cf-4 scroll-mt-52">
           <div>
             <p className="font-mono text-cf-xs font-bold uppercase tracking-widest text-ink-muted">CF-DS-02 / CF-DS-03</p>
             <h2 id="foundations-title" className="text-cf-xl font-black">Foundations and interaction states</h2>
@@ -199,7 +199,7 @@ export default function DesignSystemPage() {
           </Panel>
         </section>
 
-        <section id="roles" aria-labelledby="roles-title" className="scroll-mt-28">
+        <section id="roles" aria-labelledby="roles-title" className="scroll-mt-52">
           <Panel>
             <RoleSelector
               legend="Choose the organization role"
@@ -223,7 +223,7 @@ export default function DesignSystemPage() {
           </Panel>
         </section>
 
-        <section id="workflows" aria-labelledby="workflow-title" className="space-y-cf-4 scroll-mt-28">
+        <section id="workflows" aria-labelledby="workflow-title" className="space-y-cf-4 scroll-mt-52">
           <div>
             <p className="font-mono text-cf-xs font-bold uppercase tracking-widest text-ink-muted">CF-DS-04 / CF-DS-05</p>
             <h2 id="workflow-title" className="text-cf-xl font-black">Approval and document patterns</h2>
