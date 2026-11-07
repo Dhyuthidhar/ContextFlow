@@ -28,6 +28,8 @@ const navLinks = [
 export default function Sidebar() {
   const pathname = usePathname()
 
+  if (pathname === '/design-system') return null
+
   return (
     <aside
       className="flex flex-col h-full shrink-0"

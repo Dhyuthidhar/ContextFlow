@@ -5,6 +5,19 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Bold boundaries. Clear authority. No ambiguity.' })).toBeVisible()
 })
 
+test('keeps legacy dashboard navigation out of the review focus order', async ({ page }) => {
+  await expect(page.getByRole('link', { name: 'Projects' })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Principles' })).toHaveCount(0)
+
+  await page.keyboard.press('Tab')
+  await expect(page.getByRole('link', { name: 'Foundations' })).toBeFocused()
+
+  await page.goto('/projects/new')
+  await expect(page.getByRole('heading', { name: 'New Project' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Projects' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Principles' })).toBeVisible()
+})
+
 test('exposes labelled component contracts and readable status contrast', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Continue with Google Workspace' })).toBeVisible()
   await expect(page.locator('input[type="password"]')).toHaveCount(0)
