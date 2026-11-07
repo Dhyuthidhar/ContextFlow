@@ -1,6 +1,13 @@
 # ContextFlow
 
-ContextFlow is an internal engineering-context prototype. The V1 product scope is captured in [the repository specification](docs/product/CONTEXTFLOW_V1_PRODUCT_AND_IMPLEMENTATION_SPEC.md).
+ContextFlow is an internal engineering-context prototype. The controlling V1 product scope is captured in [the repository specification](docs/product/CONTEXTFLOW_V1_PRODUCT_AND_IMPLEMENTATION_SPEC.md).
+
+Approved target architecture and planning documents:
+
+- [ADR-001 — Railway-first infrastructure for ContextFlow V1](docs/architecture/adr/ADR-001-railway-first.md)
+- [ContextFlow V1 Railway-first implementation plan](docs/planning/CONTEXTFLOW_V1_IMPLEMENTATION_PLAN.md)
+
+These documents describe approved targets and gates. They do not claim that the Railway architecture is implemented or deployed.
 
 ## Baseline test suite
 
